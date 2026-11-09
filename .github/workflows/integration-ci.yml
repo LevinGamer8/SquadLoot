@@ -19,6 +19,15 @@ jobs:
         run: python3 -m compileall -q SquadLoot-Pi-Server SquadLoot-Windows-Client
       - name: Tests
         run: xvfb-run -a python3 -m unittest discover -s tests -v
+      - name: Parse embedded web dashboard JavaScript
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          html = Path('SquadLoot-Pi-Server/app/dashboard.html').read_text()
+          script = html.split('<script>', 1)[1].split('</script>', 1)[0]
+          Path('/tmp/squadloot-dashboard.js').write_text(script)
+          PY
+          node --check /tmp/squadloot-dashboard.js
       - name: Build update archives and verify manifest
         run: |
           python3 scripts/build_release.py --version "$(cat SquadLoot-Pi-Server/VERSION)" --repository "$GITHUB_REPOSITORY" --output dist

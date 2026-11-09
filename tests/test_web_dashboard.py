@@ -49,6 +49,18 @@ class SelfContainedTests(unittest.TestCase):
             self.assertIn(urlsplit(url).hostname, allowed)
         self.assertNotRegex(HTML, r'<iframe[^>]+src=')
 
+    def test_v131_archive_csv_and_fortnite_images_survived_redesign(self):
+        """A visual redesign must not silently remove existing features."""
+        for text in ('id="archiveCard"', 'id="archiveRows"',
+                     'id="archivePrev"', 'id="archiveNext"',
+                     'id="downloadCsv"', '/api/matches?limit=',
+                     '/api/export/matches.csv', 'function loadArchive',
+                     'function exactFortniteImage', 'fortnite-api.com',
+                     'fortnite-pirate-shop-token-item.jpg'):
+            self.assertIn(text, HTML, text)
+        self.assertIn('image.addEventListener(\'error\'', HTML)
+        self.assertNotIn('innerHTML', HTML)
+
     def test_still_a_single_release_file(self):
         self.assertIn('app/dashboard.html', selfupdate.RELEASE_FILES)
         self.assertIn('app/dashboard.html', selfupdate.REQUIRED)

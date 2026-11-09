@@ -350,3 +350,20 @@ sudo sh PI_SELFUPDATE_CHECK.sh --check-only
 sudo sh PI_SELFUPDATE_CHECK.sh
 sudo docker compose -f compose.yaml -f compose.tunnel.yaml ps
 ```
+
+
+## SquadLoot 1.4.0 – Claude-Redesign und Daten-Erhalt
+
+Das Windows-Fenster und das Web-Dashboard wurden mit einheitlichem Designsystem
+neu aufgebaut. Alle vorhandenen Matchdaten bleiben im Docker-Volume erhalten.
+Die Match-Historie zeigt weiterhin die 20 jüngsten Runden als Kurzansicht;
+über **Vollständiges Matcharchiv** und **CSV exportieren** sind alle
+historischen Matchdaten verfügbar. Originale Fortnite-Bilder werden nur für
+verifizierte Itemnamen über feste HTTPS-Bildquellen geladen; unbekannte Items
+haben einen neutralen Fallback.
+
+**Kein manuelles Übertragen nötig:** Nach GitHub Release v1.4.0 führt auf dem Pi
+`sudo sh /opt/squadloot/PI_SELFUPDATE_CHECK.sh` den sicheren Updateablauf
+inklusive automatischer Clientpaket-Veröffentlichung aus. Bereits konfigurierte
+Windows-Clients erhalten das neue Design über die bestehende Update-API beim
+nächsten Neustart. Ein Eingriff in SQLite oder Cloudflare ist nicht notwendig.

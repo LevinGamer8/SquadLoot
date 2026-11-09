@@ -1,0 +1,37 @@
+name: SquadLoot Integration CI
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [integration/**]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install UI smoke-test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb python3-tk
+      - name: Compile
+        run: python3 -m compileall -q SquadLoot-Pi-Server SquadLoot-Windows-Client
+      - name: Tests
+        run: xvfb-run -a python3 -m unittest discover -s tests -v
+      - name: Build update archives and verify manifest
+        run: |
+          python3 scripts/build_release.py --version "$(cat SquadLoot-Pi-Server/VERSION)" --repository "$GITHUB_REPOSITORY" --output dist
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          meta=json.loads(Path('dist/latest.json').read_text())
+          for prefix in ('','client_'):
+              key='package_' if not prefix else 'client_package_'
+              url=meta[key+'url']
+              p=Path('dist')/url.split('/')[-1]
+              assert p.is_file(),p
+              assert p.stat().st_size==meta[key+'size']
+              assert hashlib.sha256(p.read_bytes()).hexdigest()==meta[key+'sha256']
+          print('SHA-256 and package sizes verified')
+          PY

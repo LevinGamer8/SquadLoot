@@ -58,3 +58,33 @@ GitHub: https://github.com/LevinGamer8/SquadLoot/releases/latest
 Updates: Nach dieser Version aktualisiert der Pi-Server ueber GitHub Releases
 sowohl sich selbst als auch den client.zip-Feed fuer die bestehenden PCs.
 Die PCs installieren die geprueften Clientupdates beim naechsten App-Start.
+
+
+SQUADLOOT 1.4.0 - NEUE OBERFLAECHE
+==================================
+
+Die Oberflaeche wurde komplett neu gestaltet. Die Funktionen sind dieselben,
+nur anders sortiert. Die Seitenleiste hat jetzt sechs Bereiche:
+
+1. Dashboard        Verbindung, aktuelle Runde, deine und die Squad-Truhen,
+                    bestaetigte Matches, Munition, Obst, zerstoerte Truhen,
+                    Belohnungen und die Squad-Uebersicht mit Beitragsbalken.
+2. Live-Tracking    Manuelle Zaehler, Beta-Bildschirmerkennung, Erkennungs-
+                    qualitaet und das zuletzt erkannte Ereignis.
+3. Match-Historie   Alle vom Replay bestaetigten Runden.
+4. Squad            Beitrag je Spieler und Statistik je Epic-Account.
+5. Einstellungen    Frueher 'Verbindung'. Server, Cloudflare Access,
+                    Epic-Account, Replay-Ordner, ChestCounter, Live-Erkennung
+                    und Updates in getrennten Abschnitten. Token und Secret
+                    bleiben maskiert; das Augensymbol zeigt sie kurz an.
+6. Updates          Installierte und verfuegbare Version, letzte Pruefung,
+                    Status und Fortschritt.
+
+Farbbedeutung, ueberall gleich:
+  Cyan   = live uebertragen, noch nicht bestaetigt
+  Gruen  = vom Replay bestaetigt (verbindlich)
+  Gelb   = Schaetzung oder Beta-Funktion
+  Rot    = Fehler oder zerstoerte Truhe
+
+Einstellungen und Datenbank bleiben unveraendert; es ist keine Neueinrichtung
+noetig. Das Update kommt wie gewohnt automatisch vom Pi.

@@ -22,6 +22,7 @@ spec=importlib.util.spec_from_file_location('squad_updates_server',SERVER/'app'/
 server=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(server)
 TOKEN='test-very-long-and-secret-squad-token-1234'
+VERSION=(CLIENT/'VERSION').read_text(encoding='ascii').strip()
 
 
 def client_archive():
@@ -41,7 +42,7 @@ class AutoUpdateTests(unittest.TestCase):
         cls.updates=cls.basedir/'updates'
         cls.updates.mkdir()
         cls.raw=client_archive()
-        cls.manifest={'version':'1.3.0','archive_sha256':hashlib.sha256(cls.raw).hexdigest(),
+        cls.manifest={'version':VERSION,'archive_sha256':hashlib.sha256(cls.raw).hexdigest(),
                       'archive_size':len(cls.raw),'notes':'Dark layout and auto updates'}
         (cls.updates/'client.zip').write_bytes(cls.raw)
         (cls.updates/'latest.json').write_text(json.dumps(cls.manifest),encoding='utf-8')
@@ -65,7 +66,7 @@ class AutoUpdateTests(unittest.TestCase):
 
     def test_01_manifest_and_download_require_token(self):
         m=self.api.call('/api/client-update/manifest')
-        self.assertEqual(m['version'],'1.3.0')
+        self.assertEqual(m['version'],VERSION)
         self.assertEqual(self.api.download_update(),self.raw)
         with self.assertRaisesRegex(RuntimeError,'401'):
             Api(self.url,'x'*26).call('/api/client-update/manifest')
@@ -76,17 +77,17 @@ class AutoUpdateTests(unittest.TestCase):
         with io.BytesIO() as buffer:
             with zipfile.ZipFile(buffer,'w') as z:
                 for name in updater.REQUIRED_FILES:
-                    z.writestr(name,'1.3.0' if name=='VERSION' else '# test')
+                    z.writestr(name,VERSION if name=='VERSION' else '# test')
                 z.writestr('../evil.py','something')
             with self.assertRaisesRegex(ValueError,'nicht erlaubte'):
-                updater.inspect_archive(buffer.getvalue(),'1.3.0')
+                updater.inspect_archive(buffer.getvalue(),VERSION)
 
     def test_03_verify_manifest(self):
-        self.assertEqual(updater.validate_manifest(self.manifest)['version'],'1.3.0')
+        self.assertEqual(updater.validate_manifest(self.manifest)['version'],VERSION)
         with self.assertRaises(ValueError):
             updater.validate_manifest({**self.manifest,'archive_sha256':'broken'})
         with self.assertRaises(ValueError):
-            updater.validate_manifest({**self.manifest,'version':'1.3.0\nevil'})
+            updater.validate_manifest({**self.manifest,'version':VERSION+'\nevil'})
         self.assertIsNone(updater.validate_manifest({'version':None,'available':False}))
 
     def test_04_download_apply_preserves_user_data_and_blocks_downgrade(self):
@@ -102,9 +103,9 @@ class AutoUpdateTests(unittest.TestCase):
             with patch.object(updater,'PENDING_DIR',update_dir),\
                  patch.object(updater,'PENDING_FILE',update_dir/'pending.json'),\
                  patch.object(updater,'ARCHIVE_FILE',update_dir/'pending.zip'):
-                self.assertEqual(updater.check_and_stage(cfg,root=root),'1.3.0')
-                self.assertEqual(updater.apply_pending(root=root),'1.3.0')
-                self.assertEqual((root/'VERSION').read_text().strip(),'1.3.0')
+                self.assertEqual(updater.check_and_stage(cfg,root=root),VERSION)
+                self.assertEqual(updater.apply_pending(root=root),VERSION)
+                self.assertEqual((root/'VERSION').read_text().strip(),VERSION)
                 self.assertIn('class Gui', (root/'app.py').read_text())
                 self.assertEqual((root/'my-private-config.json').read_text(),'{"token":"keep"}')
                 self.assertFalse((update_dir/'pending.json').exists())
@@ -118,6 +119,30 @@ class AutoUpdateTests(unittest.TestCase):
                 (root/'VERSION').write_text('1.0.0')
                 with self.assertRaisesRegex(ValueError,'Integritaetspruefung'):
                     updater.check_and_stage({'server_url':self.url,'token':TOKEN},root=root)
+
+    def test_05b_update_allowlist_stays_compatible_with_installed_clients(self):
+        """Adding a client file breaks auto-update for everyone already running.
+
+        An installed build validates the downloaded ZIP against *its own*
+        ALLOWED_FILES. A package containing a file that older release does not
+        know is rejected with 'nicht erlaubte Dateien', so the user would have
+        to reinstall by hand. The redesign therefore stays inside these names.
+        """
+        self.assertEqual(updater.ALLOWED_FILES, frozenset({
+            'VERSION', 'app.py', 'bootstrap.py', 'client_core.py', 'update_manager.py',
+            'replay_reader.py', 'vision.py', 'STARTEN.cmd', 'AUSWERTEN.cmd',
+            'ORIGINALPROGRAMM.cmd', 'SETUP_VISION.cmd', 'vision-requirements.txt',
+            'README-CLIENT.txt'}))
+        self.assertEqual(updater.REQUIRED_FILES, frozenset({
+            'VERSION', 'app.py', 'client_core.py', 'bootstrap.py', 'update_manager.py',
+            'replay_reader.py', 'STARTEN.cmd'}))
+        shipped = {path.name for path in CLIENT.iterdir()
+                   if path.is_file() and path.suffix in ('.py', '.cmd')}
+        self.assertTrue(shipped.issubset(updater.ALLOWED_FILES),
+                        'unlisted client file: ' + str(sorted(shipped - updater.ALLOWED_FILES)))
+        # Every shipped module must fit the per-file limit of the installed updater.
+        for name in shipped:
+            self.assertLess((CLIENT / name).stat().st_size, 2 * 1024 * 1024, name)
 
     def test_06_server_manifest_missing_returns_none(self):
         prior=server.UPDATE_MANIFEST

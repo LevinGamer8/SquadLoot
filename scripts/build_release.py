@@ -55,7 +55,7 @@ def build(version:str,repository:str,output:pathlib.Path):
         'client_version':version,'client_package_url':prefix+update_filename,
         'client_package_sha256':hashlib.sha256(update_data).hexdigest(),
         'client_package_size':len(update_data),
-        'notes':f'SquadLoot {version}: Live-Schätzungen, neues Desktop-Design, gemeinsame Updates für Pi und Windows',
+        'notes':f'SquadLoot {version}: komplett neu gestaltete Oberfläche für Windows und Web, sechs Bereiche im Desktop-Client, überarbeitetes Pi-Dashboard, gemeinsame Updates für Pi und Windows',
     }
     (output/'latest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     installer=ROOT/'SQUADLOOT_INSTALLIEREN.ps1'

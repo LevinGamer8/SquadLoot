@@ -4,6 +4,23 @@ SquadLoot hostet eure Fortnite-Truhenstatistiken lokal auf dem Raspberry Pi.
 Der Code ist als öffentliche Release-Quelle gedacht; **keine echten Zugangsdaten
 werden in Git gespeichert**.
 
+## Oberfläche
+
+Ab 1.4.0 teilen Windows-Client und Pi-Dashboard ein gemeinsames Designsystem
+(dunkles Theme, Indigo-/Cyan-Akzent, Vektor-Icons statt Emojis).
+Details: [docs/DESIGN.md](docs/DESIGN.md) · Änderungen: [CHANGELOG.md](CHANGELOG.md)
+
+| Windows-Client | Pi-Dashboard |
+|---|---|
+| ![Dashboard](docs/screenshots/windows-dashboard.png) | ![Web-Übersicht](docs/screenshots/web-overview.png) |
+| ![Live-Tracking](docs/screenshots/windows-live.png) | ![Loot-Galerie](docs/screenshots/web-loot.png) |
+| ![Einstellungen](docs/screenshots/windows-settings.png) | ![Match-Historie](docs/screenshots/web-history.png) |
+
+Weitere Ansichten: [Squad](docs/screenshots/windows-squad.png) ·
+[Match-Historie](docs/screenshots/windows-history.png) ·
+[Updates](docs/screenshots/windows-updates.png) ·
+[Mobil](docs/screenshots/web-mobile.png)
+
 ## GitHub Release veröffentlichen
 
 Der GitHub Actions Workflow `.github/workflows/server-release.yml` erstellt bei
@@ -32,7 +49,7 @@ Schütze das GitHub-Konto mit 2FA, veröffentliche nur überprüfte Tags und
 verwende keine untrusted Pull-Requests als Release-Quelle.
 
 
-## Windows Clients 1.3.0 – drei Spieler
+## Windows Clients – drei Spieler
 
 Die Freunde brauchen **keine GitHub-Zugangsdaten**. Sie laden den
 [Windows-Client aus dem neuesten Release](https://github.com/LevinGamer8/SquadLoot/releases/latest)

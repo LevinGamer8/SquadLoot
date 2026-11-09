@@ -3,7 +3,7 @@
 
 Only trusted GitHub Releases should be configured as the manifest source.
 A release is downloaded and hash-checked before a staged update with backups.
-No .env, persistent Docker volume, client releases or Cloudflare token is updated.
+The Pi retains .env, Docker data, and Cloudflare settings; it can publish clients from the same release.
 """
 from __future__ import annotations
 
@@ -32,6 +32,7 @@ STATE = BASE / '.server_update_state.json'
 LOCK_FILE = BASE / '.selfupdate.lock'
 BACKUPS = BASE / '.server_backups'
 MAX_ZIP_BYTES = 12 * 1024 * 1024
+MAX_CLIENT_ZIP_BYTES = 4 * 1024 * 1024
 MAX_UNPACKED_BYTES = 24 * 1024 * 1024
 
 # Strict allowlist: never replace .env, locally configured endpoint, or client update payloads.
@@ -98,6 +99,45 @@ def parse_manifest(raw: bytes) -> dict:
     if type(size) is not int or not 100 <= size <= MAX_ZIP_BYTES:
         raise ValueError('Ungültige Update-Paketgröße')
     return manifest
+
+
+def get_client_package(manifest: dict) -> bytes | None:
+    """Fetch the optional Windows client from the SAME trusted GitHub release."""
+    required={'client_version','client_package_url','client_package_sha256','client_package_size'}
+    if not required.issubset(manifest):
+        return None
+    version=manifest['client_version']
+    parse_version(version)
+    if version != manifest['version']:
+        raise ValueError('Server- und Client-Release-Version unterschiedlich')
+    sha=manifest['client_package_sha256']
+    size=manifest['client_package_size']
+    if not isinstance(sha,str) or not re.fullmatch(r'[0-9a-f]{64}',sha):
+        raise ValueError('Client-Release SHA ungueltig')
+    if type(size) is not int or not 100 <= size <= MAX_CLIENT_ZIP_BYTES:
+        raise ValueError('Client-Release Groesse ungueltig')
+    # If already on the Pi, skip the client download.
+    local=BASE/'updates'/'latest.json'
+    if local.is_file():
+        try:
+            old=json.loads(local.read_text(encoding='utf-8')).get('version','0.0.0')
+            if parse_version(old)>=parse_version(version):
+                return None
+        except (ValueError,KeyError,TypeError):
+            pass
+    url=manifest['client_package_url']
+    raw=download(url,MAX_CLIENT_ZIP_BYTES)
+    if len(raw)!=size or hashlib.sha256(raw).hexdigest()!=sha:
+        raise ValueError('Client-Release Integritaetspruefung fehlgeschlagen')
+    return raw
+
+
+def publish_client_package(raw: bytes, notes: str):
+    import update_publish
+    with tempfile.TemporaryDirectory(prefix='squadloot-client-',dir=str(BASE)) as d:
+        source=Path(d)/'client.zip'
+        source.write_bytes(raw)
+        update_publish.publish(source,notes)
 
 
 def extract_release(package: bytes, destination: Path, wanted_version: str) -> list[Path]:
@@ -209,27 +249,33 @@ def run(check_only: bool = False, quiet: bool = False) -> bool:
     cfg = read_config()
     manifest_url = cfg.get('MANIFEST_URL', '')
     if not manifest_url or 'example.com' in manifest_url:
-        raise ValueError('Bitte MANIFEST_URL in server-update.conf auf deinen GitHub Release setzen')
+        raise ValueError('Bitte MANIFEST_URL in server-update.conf auf dein GitHub Release setzen')
     manifest = parse_manifest(download(manifest_url, 1024 * 64))
     current = VERSION_FILE.read_text(encoding='utf-8').strip()
-    if parse_version(manifest['version']) <= parse_version(current):
-        if not quiet:
-            print(f'SquadLoot aktuell: {current} (GitHub: {manifest["version"]})')
-        return False
-    package_url = urllib.parse.urljoin(manifest_url, manifest['package_url'])
-    package = download(package_url, MAX_ZIP_BYTES)
-    if len(package) != manifest['package_size'] or hashlib.sha256(package).hexdigest() != manifest['package_sha256']:
-        raise ValueError('Update-Checksum oder Paketgröße stimmt nicht')
+    server_new = parse_version(manifest['version']) > parse_version(current)
+    package = None
+    if server_new:
+        package_url = urllib.parse.urljoin(manifest_url, manifest['package_url'])
+        package = download(package_url, MAX_ZIP_BYTES)
+        if len(package) != manifest['package_size'] or hashlib.sha256(package).hexdigest() != manifest['package_sha256']:
+            raise ValueError('Server-Update-Checksum oder Paketgröße stimmt nicht')
+    # Fetch/verify both packages before we change installed files.
+    client_data = get_client_package(manifest)
     if check_only:
-        with tempfile.TemporaryDirectory(prefix='squadloot-check-') as td:
-            extract_release(package, Path(td), manifest['version'])
+        if server_new:
+            with tempfile.TemporaryDirectory(prefix='squadloot-check-') as td:
+                extract_release(package, Path(td), manifest['version'])
         if not quiet:
-            print(f'Geprüft: Update {current} → {manifest["version"]} verfügbar')
-        return True
-    apply_release(package, manifest)
+            print('Verfuegbar: Serverupdate' if server_new else 'Server aktuell',
+                  '+ Clientupdate' if client_data else '')
+        return server_new or client_data is not None
+    if server_new:
+        apply_release(package, manifest)
+    if client_data is not None:
+        publish_client_package(client_data, manifest.get('notes',''))
     if not quiet:
-        print(f'Update installiert: {current} → {manifest["version"]}')
-    return True
+        print(f'SquadLoot Version {current} -> {manifest["version"]}; Clientupdate: {"ja" if client_data is not None else "nein"}')
+    return server_new or client_data is not None
 
 
 def main():

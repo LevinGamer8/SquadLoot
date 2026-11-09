@@ -1,0 +1,29 @@
+SQUADLOOT 1.3.0 - DEINER SQUAD BEITRETEN
+======================================
+
+1. Setup-ZIP herunterladen und vollstaendig entpacken.
+2. SQUADLOOT_INSTALLIEREN.cmd doppelklicken. Das Skript laedt den
+   Windows-Client aus dem offiziellen GitHub Release und legt eine
+   SquadLoot-Verknuepfung auf dem Desktop an.
+3. Python 3.11 oder neuer installieren (falls nicht vorhanden):
+   https://www.python.org/downloads/windows/
+4. Fortnite ChestCounter vom Original-Projekt holen und einmal starten:
+   https://github.com/LED-N/Fortnite-ChestCounter/releases/latest
+5. Fortnite -> Einstellungen -> Spiel -> Wiederholungen aufzeichnen: EIN.
+6. SquadLoot Desktopverknuepfung starten und im Tab Verbindung eingeben:
+   Server-URL: https://squadloot.megacraft.de
+   Squad-Token: vom Betreiber privat erhalten
+   CF Access Client-ID: persoenliche ID vom Betreiber
+   CF Access Client-Secret: persoenliches Secret vom Betreiber
+   Anzeigename: dein eigener Fortnite-Name
+7. Unter Verbindung auf Speichern & verbinden klicken.
+8. Live-Erkennung nur optional: In SquadLoot auf Live-Erkennung gehen,
+   SETUP_VISION.cmd ausfuehren, kleines PNG der Suchaufforderung waehlen,
+   Interaktionstaste einstellen, dann Erkennung starten. Nicht garantiert
+   exakte Live-Zahlen; nach dem Match bestaetigt das Replay die Werte.
+
+WICHTIG: Weder GitHub noch Discord sollen persoenliche Access-Tokens sehen.
+Gebt die Zugangsdaten nur direkt per sicherem privaten Kanal weiter.
+
+Wenn du keinerlei Live-Schaetzungen brauchst, laeuft alles ausschliesslich
+ueber Replay-Auswertung und synchronisiert nach Matchende.

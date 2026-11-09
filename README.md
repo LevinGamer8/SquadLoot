@@ -30,3 +30,31 @@ Der Pi prüft Paket-Hash, Dateiliste, ZIP-Inhalte und Version. Die SHA-256-Prüf
 ist jedoch keine zusätzliche kryptografische Signatur des Herausgebers.
 Schütze das GitHub-Konto mit 2FA, veröffentliche nur überprüfte Tags und
 verwende keine untrusted Pull-Requests als Release-Quelle.
+
+
+## Windows Clients 1.3.0 – drei Spieler
+
+Die Freunde brauchen **keine GitHub-Zugangsdaten**. Sie laden den
+[Windows-Client aus dem neuesten Release](https://github.com/LevinGamer8/SquadLoot/releases/latest)
+oder einmal `SquadLoot-Freunde-Setup-vX.Y.Z.zip` und führen das enthaltene `SQUADLOOT_INSTALLIEREN.cmd` aus. Python 3.11+, ChestCounter und eingeschaltete
+Fortnite-Replays sind erforderlich.
+
+Zum Einrichten benötigt jeder Spieler:
+- `https://squadloot.megacraft.de` als Serveradresse
+- einen **gemeinsamen Squad-Token** (privat übermittelt)
+- eine eigene **Cloudflare Access Service Client-ID und Secret** (privat)
+- den eigenen Fortnite-Spielernamen
+
+Live-Erkennung: Nur als **experimentelle Schätzung** durch optische
+Erkennung + lokal abgefragte Interaktionstaste. Keine Speicherzugriffe,
+keine Fortnite-Paketmanipulation oder Entschlüsselung von Live-Replays.
+Bildschirmmodus standardmäßig ausgeschaltet, wenige ROI-Screenshots/Sekunde.
+Für reale Daten muss jedes Match mit ChestCounter nachträglich ausgewertet werden.
+
+### Updates
+
+Ein Release-Tag oder ein manueller Start des Workflows erstellt
+Pi-Server-ZIP, Windows-Client-ZIP, internes Windows-Update-ZIP und `latest.json`
+**aus demselben Commit**. Der Pi lädt beide Pakete und stellt das Windows-
+Update über die bestehende geschützte Update-API zur Verfügung. Die Apps
+installieren es beim nächsten Start.

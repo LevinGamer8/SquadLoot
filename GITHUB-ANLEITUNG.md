@@ -117,3 +117,30 @@ wenige Personen beschränken. Updates nur von vertrauenswürdigen Branches/Tags.
 Der Pi-Self-Updater aktualisiert **SquadLoot**, nicht Debian, Docker,
 Cloudflared und nicht den separat betriebenen Original-ChestCounter.
 Der Windows-Client hat seinen eigenen Updater via SquadLoot API.
+
+## SquadLoot 1.3 – Windows Clients mit veröffentlichen
+
+Das Repo enthält nun den Ordner `SquadLoot-Windows-Client` und der GitHub-Workflow
+baut bei jedem Release-Tag **Pi-Server + Windows-Client gemeinsam**.
+
+Einfach: Das **Repository-Quellpaket** auf Windows entpacken und im Hauptordner
+`PUBLISH_GITHUB.cmd` doppelklicken. Git muss installiert sein und Git Credential
+Manager muss dein GitHub-Konto authentifizieren können. Das Skript klont das
+bestehende Repo, kopiert die neuen Quelldateien hinein, committet und pusht den
+Tag `v1.3.0`. Es überschreibt keine existierenden Tags und liest niemals deine
+lokalen `.env` oder `config.json` aus dem Pi/Client.
+
+Alternativ: selbst Git-Push + Tag erstellen, oder auf GitHub **Actions → Publish
+SquadLoot (Pi and Windows) → Run workflow** mit Version 1.3.0. Voraussetzung:
+Die Dateien `VERSION` auf beiden Plattformen müssen mit dem Tag übereinstimmen.
+
+Nach einem erfolgreichen Release finden Freunde unter
+https://github.com/LevinGamer8/SquadLoot/releases/latest
+`SquadLoot-Windows-Client-v1.3.0.zip` zum Herunterladen. Keine Discord-Dateigröße.
+
+**Für den Pi:** Der Release-Manifest enthält nun auch das Client-Update. Wenn du
+von einem älteren Self-Updater aktualisierst, bitte nach dem Pi-Update die
+`PI_SELFUPDATE_CHECK.sh` **ein zweites Mal ausführen**. Dann veröffentlicht die
+neue Pi-Version auch das Windows-Update unter deiner bestehenden, über Cloudflare
+Access geschützten API. Alle Windows-Clients installieren dieses Update beim
+nächsten Programmstart.

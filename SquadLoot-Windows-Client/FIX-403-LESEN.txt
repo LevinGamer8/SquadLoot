@@ -1,0 +1,15 @@
+SquadLoot Windows-Client - Diagnose-Update HTTP 403
+
+1. STARTEN.cmd / das Client-Fenster vollstaendig schliessen.
+2. Den INHALT des Ordners SquadLoot-Windows-Client aus diesem ZIP in deinen bisherigen
+   SquadLoot-Client-Ordner kopieren und vorhandene Dateien ueberschreiben.
+3. STARTEN.cmd erneut ausfuehren. Die Anmeldung aus %APPDATA%\SquadLootClient\config.json
+   bleibt unveraendert.
+4. Im Fehlerfall erscheint nun z.B. /api/match: HTTP 403 [HTML statt JSON ...]
+   Gib nur den API-Pfad, HTTP-Status und den Text in eckigen Klammern weiter;
+   keine Tokens/Secrets oder komplette Config posten.
+
+Aenderungen: Eindeutiger User-Agent SquadLootClient/1.0, Accept application/json,
+detailliertere Fehlerdiagnose ohne Ausgabe von Token oder Secret.
+
+HINWEIS: Dieser Fix ist nicht live mit deinem Cloudflare-Konto getestet.

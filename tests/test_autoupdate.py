@@ -41,7 +41,7 @@ class AutoUpdateTests(unittest.TestCase):
         cls.updates=cls.basedir/'updates'
         cls.updates.mkdir()
         cls.raw=client_archive()
-        cls.manifest={'version':'1.3.0','archive_sha256':hashlib.sha256(cls.raw).hexdigest(),
+        cls.manifest={'version':'1.3.1','archive_sha256':hashlib.sha256(cls.raw).hexdigest(),
                       'archive_size':len(cls.raw),'notes':'Dark layout and auto updates'}
         (cls.updates/'client.zip').write_bytes(cls.raw)
         (cls.updates/'latest.json').write_text(json.dumps(cls.manifest),encoding='utf-8')
@@ -65,7 +65,7 @@ class AutoUpdateTests(unittest.TestCase):
 
     def test_01_manifest_and_download_require_token(self):
         m=self.api.call('/api/client-update/manifest')
-        self.assertEqual(m['version'],'1.3.0')
+        self.assertEqual(m['version'],'1.3.1')
         self.assertEqual(self.api.download_update(),self.raw)
         with self.assertRaisesRegex(RuntimeError,'401'):
             Api(self.url,'x'*26).call('/api/client-update/manifest')
@@ -76,17 +76,17 @@ class AutoUpdateTests(unittest.TestCase):
         with io.BytesIO() as buffer:
             with zipfile.ZipFile(buffer,'w') as z:
                 for name in updater.REQUIRED_FILES:
-                    z.writestr(name,'1.3.0' if name=='VERSION' else '# test')
+                    z.writestr(name,'1.3.1' if name=='VERSION' else '# test')
                 z.writestr('../evil.py','something')
             with self.assertRaisesRegex(ValueError,'nicht erlaubte'):
-                updater.inspect_archive(buffer.getvalue(),'1.3.0')
+                updater.inspect_archive(buffer.getvalue(),'1.3.1')
 
     def test_03_verify_manifest(self):
-        self.assertEqual(updater.validate_manifest(self.manifest)['version'],'1.3.0')
+        self.assertEqual(updater.validate_manifest(self.manifest)['version'],'1.3.1')
         with self.assertRaises(ValueError):
             updater.validate_manifest({**self.manifest,'archive_sha256':'broken'})
         with self.assertRaises(ValueError):
-            updater.validate_manifest({**self.manifest,'version':'1.3.0\nevil'})
+            updater.validate_manifest({**self.manifest,'version':'1.3.1\nevil'})
         self.assertIsNone(updater.validate_manifest({'version':None,'available':False}))
 
     def test_04_download_apply_preserves_user_data_and_blocks_downgrade(self):
@@ -102,9 +102,9 @@ class AutoUpdateTests(unittest.TestCase):
             with patch.object(updater,'PENDING_DIR',update_dir),\
                  patch.object(updater,'PENDING_FILE',update_dir/'pending.json'),\
                  patch.object(updater,'ARCHIVE_FILE',update_dir/'pending.zip'):
-                self.assertEqual(updater.check_and_stage(cfg,root=root),'1.3.0')
-                self.assertEqual(updater.apply_pending(root=root),'1.3.0')
-                self.assertEqual((root/'VERSION').read_text().strip(),'1.3.0')
+                self.assertEqual(updater.check_and_stage(cfg,root=root),'1.3.1')
+                self.assertEqual(updater.apply_pending(root=root),'1.3.1')
+                self.assertEqual((root/'VERSION').read_text().strip(),'1.3.1')
                 self.assertIn('class Gui', (root/'app.py').read_text())
                 self.assertEqual((root/'my-private-config.json').read_text(),'{"token":"keep"}')
                 self.assertFalse((update_dir/'pending.json').exists())

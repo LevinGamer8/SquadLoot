@@ -60,17 +60,17 @@ class DistributionTests(unittest.TestCase):
     def test_packs_both_client_and_server_updates(self):
         with tempfile.TemporaryDirectory() as td:
             out=Path(td)
-            pi=release.build('1.3.0','LevinGamer8/SquadLoot',out)
+            pi=release.build('1.3.1','LevinGamer8/SquadLoot',out)
             manifest=json.loads((out/'latest.json').read_text())
-            self.assertEqual(manifest['client_version'],'1.3.0')
+            self.assertEqual(manifest['client_version'],'1.3.1')
             self.assertEqual(manifest['package_sha256'],hashlib.sha256(pi.read_bytes()).hexdigest())
-            client=out/'SquadLoot-Windows-1.3.0-update.zip'
+            client=out/'SquadLoot-Windows-1.3.1-update.zip'
             self.assertEqual(manifest['client_package_sha256'],hashlib.sha256(client.read_bytes()).hexdigest())
             with zipfile.ZipFile(client) as z:
                 self.assertIn('vision.py',z.namelist())
                 self.assertIn('app.py',z.namelist())
-                self.assertEqual(z.read('VERSION').decode().strip(),'1.3.0')
-            full=out/'SquadLoot-Windows-Client-v1.3.0.zip'
+                self.assertEqual(z.read('VERSION').decode().strip(),'1.3.1')
+            full=out/'SquadLoot-Windows-Client-v1.3.1.zip'
             with zipfile.ZipFile(full) as z:
                 self.assertIn('SquadLoot-Windows-Client/STARTEN.cmd',z.namelist())
                 self.assertNotIn('SquadLoot-Windows-Client/config.json',z.namelist())

@@ -46,6 +46,7 @@ RELEASE_FILES = frozenset({
     'PI_CLIENT_RELEASE.sh', 'update_publish.py',
     'server_selfupdate.py', 'server-update.conf.example',
     'PI_SELFUPDATE_CHECK.sh', 'PI_SELFUPDATE_INSTALL.sh',
+    'PI_BACKUP.sh', 'PI_BACKUP_AUTOMATISCH.sh',
 })
 REQUIRED = frozenset({
     'VERSION', 'compose.yaml', 'compose.tunnel.yaml', 'app/Dockerfile',

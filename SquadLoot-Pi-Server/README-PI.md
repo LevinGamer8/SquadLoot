@@ -282,3 +282,71 @@ Nur die eigentlichen Server-Dateien werden ersetzt und der Stack danach neu geba
 ```
 
 `package_url` darf relativ zur Manifest-URL oder absolut angegeben werden.
+
+## Matcharchiv und echte Fortnite-Bilder (Entwurf / naechstes Release)
+
+### Aufbewahrung
+
+- Die SQLite-Datenbank bleibt im Docker-Named-Volume `squadloot-pi_squadloot_data` gespeichert.
+- **Es gibt keine automatische Ablaufzeit und keine Loeschroutine fuer Matches.**
+- Die Hauptansicht listet zur besseren Ladezeit weiterhin die letzten 20 Runden, das neue **vollstaendige Matcharchiv** kann aber durch alle Eintraege blaettern.
+- `Alle Matches als CSV exportieren` laedt eine CSV mit **allen** Eintraegen herunter; die API `/api/export/matches.csv` ist nur mit Bearer-Token und, falls aktiviert, Cloudflare Access erreichbar.
+- Neue API: `/api/matches?offset=0&limit=30` (maximal 100 pro Seite) zum Blaettern.
+- Keine Produktivdaten mit `docker compose down -v` loeschen. Bei Docker-Volume-Loeschung oder SSD-Defekt koennen Daten sonst verloren gehen.
+
+### Automatische Backups auf dem Pi
+
+Nach Installation dieses Updates auf dem Pi **einmal** ausfuehren:
+
+```sh
+cd /opt/squadloot
+sudo sh PI_BACKUP_AUTOMATISCH.sh
+sudo sh PI_BACKUP.sh
+sudo systemctl list-timers squadloot-backup.timer
+```
+
+- Täglich ab 03:20 Uhr (mit zufaelliger Verzoegerung bis zu 10 Minuten) wird ein konsistenter SQLite-Snapshot erstellt.
+- Backup-Verzeichnis: `/opt/squadloot/backups/`, nur fuer root lesbar.
+- Backups werden 30 Tage aufbewahrt. **Dies betrifft nur alte Backup-Dateien, niemals die aktuelle Datenbank oder Matches.**
+- Backup auch auf einen zweiten Datentraeger kopieren (z. B. deine externe HDD). Backups auf derselben NVMe schuetzen nicht gegen deren Ausfall.
+- In Logs keine Tokens ausgeben. Die Backup-Datei enthaelt Spielerstatistiken und sollte vertraulich behandelt werden.
+
+### Authentische Fortnite-Bilder
+
+Das Web-Dashboard zeigt statt frei erfundener Emoji-Grafiken echte Fortnite-Bildbeispiele fuer:
+
+- Pirate Shop Access (Original-Token-Symbol, Quelle: VICE / Epic Games Screenshot)
+- Treasure Hunters Truhe (Quelle: VICE / Epic Games Screenshot)
+- Munitionskiste (Quelle: PlayStation Competition Center Screenshot)
+- Mercedes-AMG G 63, Solid Gold Gauntlets und Plunder in Paradise (Originalicons aus Fortnite-API)
+- NOMS-Lebensmittelkiste (Quelle: GamesRadar+ Screenshot)
+
+Bei Cosmetic-Drops wird zusaetzlich versucht, **nur bei exakter Namensuebereinstimmung** ein echtes Icon ueber die oeffentliche Fortnite-API zu laden (`fortnite-api.com`, API v2). Bei nicht verifizierbarem Namen bleibt der neutrale Hinweis "Bild nicht verfuegbar" statt einem falschen Item-Bild.
+
+**Hinweis:** Bilder werden extern im Browser geladen. Damit koennen die Bildanbieter die IP-Adresse des Browsers sehen; bei einer fehlenden Internetverbindung oder blockierten Drittanbieteranfragen erscheint ein neutraler Platzhalter. Es werden keine Tokens oder Replaydaten an Bildanbieter gesendet. Die Screenshots sind echte Fortnite-Aufnahmen, aber teilweise aus aelteren Spielversionen und nicht immer exakt dieselbe Behältervariante.
+
+Epic Games Fan Content Policy: https://legal.epicgames.com/epicgames/fan-art-policy
+
+
+## v1.3.1: Automatisches Upgrade von 1.3.0
+
+Dieses Release ist mit der strengen Dateiliste des Pi-Updaters aus v1.3.0
+kompatibel. Es liefert das Matcharchiv, den CSV-Export, die Fortnite-Bilder
+und einen vorbereiteten Updater mit Unterstuetzung fuer neue Backup-Skripte.
+
+**Wichtig:** Die neuen Dateien `PI_BACKUP.sh` und
+`PI_BACKUP_AUTOMATISCH.sh` sind zwar im GitHub-Quellcode, werden aber
+**noch nicht in der 1.3.1-Update-ZIP ausgeliefert**, damit der bisherige
+Pi-Updater nicht das gesamte Update ablehnt. Fuer automatische SQLite-Backups
+muss der Betreiber diese beiden Dateien vorerst getrennt installieren.
+Daten werden durch das Update nicht geloescht; der SQLite-Container nutzt
+weiterhin dasselbe benannte Docker-Volume.
+
+Der automatische Updatecheck auf dem Pi:
+
+```sh
+cd /opt/squadloot
+sudo sh PI_SELFUPDATE_CHECK.sh --check-only
+sudo sh PI_SELFUPDATE_CHECK.sh
+sudo docker compose -f compose.yaml -f compose.tunnel.yaml ps
+```

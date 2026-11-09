@@ -32,6 +32,22 @@ button:hover{background:#2980bb;transform:translateY(-1px)}button.minor{backgrou
 footer{padding:18px 4px 0;color:var(--muted);font-size:12px;line-height:1.7}
 @media(max-width:1100px){.hero,.layout{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(2,minmax(150px,1fr))}}
 @media(max-width:700px){main{padding:18px 12px 46px}.kpi-grid,.chest-grid,.loot-grid{grid-template-columns:1fr}.card{padding:16px;border-radius:16px}.kpi strong{font-size:31px}#login input{min-width:unset;width:100%}}
+
+/* Authentische Fortnite-Bilder: externe Quellen, mit Text-Fallback. */
+.asset-frame{position:relative;display:grid;place-items:center;width:100%;height:100%;overflow:hidden;border-radius:inherit;background:rgba(93,148,193,.09)}
+.fn-asset{display:block;width:100%;height:100%;object-fit:cover;object-position:center;max-width:100%}
+.asset-frame .asset-fallback{display:none;color:#9fb7cb;font-size:12px;line-height:1.2;text-align:center;padding:4px}
+.asset-frame.img-missing img{display:none}
+.asset-frame.img-missing .asset-fallback{display:block}
+.icon-badge,.tile-icon,.legend-icon,.loot-icon{padding:0;overflow:hidden;isolation:isolate}
+.loot-icon{flex-shrink:0}
+.loot-card{min-height:86px}
+.loot-card .loot-icon{width:65px;height:65px;border-radius:13px}
+.archive-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px}
+.archive-actions .pagination{display:flex;align-items:center;gap:10px}
+.archive-actions button:disabled{opacity:.45;cursor:default;transform:none}
+.asset-source{font-size:11px;color:var(--muted)}
+.asset-source a{color:#a5dfff;text-decoration:underline}
 </style></head>
 <body><main>
 <header>
@@ -55,7 +71,7 @@ footer{padding:18px 4px 0;color:var(--muted);font-size:12px;line-height:1.7}
       <div class="section-title"><h2>Aktuelle Squad-Runde</h2><span class="pill live" id="roundPill">wartet auf Daten</span></div>
       <div class="kpi-grid" id="kpis">
         <div class="card kpi"><div class="metric"><span class="sub">Aktuelle Runde</span><span class="icon-badge">🧭</span></div><strong id="round">–</strong><span class="sub" id="roundtime">Noch nicht gestartet</span></div>
-        <div class="card kpi"><div class="metric"><span class="sub">Kisten Squad</span><span class="icon-badge">🧰</span></div><strong id="chests">–</strong><span class="sub" id="confidence">Lade Daten …</span></div>
+        <div class="card kpi"><div class="metric"><span class="sub">Kisten Squad</span><span class="icon-badge"><span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="https://www.vice.com/wp-content/uploads/sites/2/2026/11/fortnite-treasure-hunters-chest.jpg?w=1024" alt="Fortnite Schatztruhen-Grafik"><span class="asset-fallback">Kein Bild</span></span></span></div><strong id="chests">–</strong><span class="sub" id="confidence">Lade Daten …</span></div>
         <div class="card kpi"><div class="metric"><span class="sub">Spieler in Runde</span><span class="icon-badge">👥</span></div><strong id="players">–</strong><span class="sub">Alle verbundenen Clients</span></div>
         <div class="card kpi"><div class="metric"><span class="sub">Bestätigte Matches</span><span class="icon-badge">🏆</span></div><strong id="matches">–</strong><span class="sub">Seit Start des Trackers</span></div>
       </div>
@@ -65,21 +81,21 @@ footer{padding:18px 4px 0;color:var(--muted);font-size:12px;line-height:1.7}
       <section class="card">
         <div class="section-title"><h2>Kisten-Überblick</h2><span class="sub">Live zusammengefasst</span></div>
         <div class="chest-grid">
-          <div class="chest-tile"><div class="tile-icon">📦</div><div><span class="sub">Gesamt</span><strong id="tileTotal">0</strong></div></div>
-          <div class="chest-tile"><div class="tile-icon">🔫</div><div><span class="sub">Munition</span><strong id="tileAmmo">0</strong></div></div>
-          <div class="chest-tile"><div class="tile-icon">🍎</div><div><span class="sub">Obst / Essen</span><strong id="tileFood">0</strong></div></div>
-          <div class="chest-tile"><div class="tile-icon">💥</div><div><span class="sub">Zerstört</span><strong id="tileDestroyed">0</strong></div></div>
+          <div class="chest-tile"><div class="tile-icon"><span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="https://www.vice.com/wp-content/uploads/sites/2/2026/11/fortnite-treasure-hunters-chest.jpg?w=1024" alt="Fortnite Schatztruhe"><span class="asset-fallback">Kein Bild</span></span></div><div><span class="sub">Gesamt</span><strong id="tileTotal">0</strong></div></div>
+          <div class="chest-tile"><div class="tile-icon"><span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="https://ik.imagekit.io/0eqydxstn/Fortnite_Battle_Royale/Weapons__Equipment__etc/Overview_Article_Screen_Shots/Ammo_Box_-Sxrkohp-q.png?tr=w-1152" alt="Fortnite Munitionskiste"><span class="asset-fallback">Kein Bild</span></span></div><div><span class="sub">Munition</span><strong id="tileAmmo">0</strong></div></div>
+          <div class="chest-tile"><div class="tile-icon"><span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="https://cdn.mos.cms.futurecdn.net/QufaJhsPjbxPz6qkFnPWxF.jpg" alt="Fortnite NOMS Obst- und Lebensmittelkiste"><span class="asset-fallback">Kein Bild</span></span></div><div><span class="sub">Obst / Essen</span><strong id="tileFood">0</strong></div></div>
+          <div class="chest-tile"><div class="tile-icon"><span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="https://www.vice.com/wp-content/uploads/sites/2/2026/11/fortnite-treasure-hunters-chest.jpg?w=1024" alt="Fortnite Schatztruhe (zerstörte Kisten als Statistik)"><span class="asset-fallback">Kein Bild</span></span></div><div><span class="sub">Zerstört</span><strong id="tileDestroyed">0</strong></div></div>
         </div>
-        <div class="note" style="margin-top:10px">Die Live-Werte sind eine Schätzung aus manuellen Klicks, optionaler Bildschirm-Erkennung und späteren Replay-Bestätigungen.</div>
+        <div class="note" style="margin-top:10px">Die Bildbeispiele stammen aus Fortnite und stellen nicht zwingend exakt den Kistentyp dieser Runde dar. Die Live-Werte sind eine Schätzung aus manuellen Klicks, optionaler Bildschirm-Erkennung und späteren Replay-Bestätigungen.</div>
       </section>
 
       <section class="card">
-        <div class="section-title"><h2>Loot-Legende</h2><span class="sub">Schneller Überblick</span></div>
+        <div class="section-title"><h2>Fortnite-Loot</h2><span class="sub">Originalbilder, sofern eindeutig</span></div>
         <div class="legend-list">
-          <div class="legend-item"><div class="label"><div class="legend-icon">🪙</div><div><strong>Shop-Token</strong><div class="sub">seltene Event-Belohnung</div></div></div><span class="pill">Loot</span></div>
-          <div class="legend-item"><div class="label"><div class="legend-icon">🚗</div><div><strong>Fahrzeug-Skins</strong><div class="sub">z. B. Mercedes G-Klasse</div></div></div><span class="pill">Kosmetik</span></div>
-          <div class="legend-item"><div class="label"><div class="legend-icon">⛏️</div><div><strong>Spitzhacken</strong><div class="sub">Pickaxe / Tools</div></div></div><span class="pill">Kosmetik</span></div>
-          <div class="legend-item"><div class="label"><div class="legend-icon">🖼️</div><div><strong>Ladebildschirme</strong><div class="sub">Loading-Screens</div></div></div><span class="pill">Sammlung</span></div>
+          <div class="legend-item"><div class="label"><div class="legend-icon"><span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="https://www.vice.com/wp-content/uploads/sites/2/2026/11/fortnite-pirate-shop-token-item.jpg?w=1024" alt="Originales Fortnite Pirate Shop Access Symbol"><span class="asset-fallback">Kein Bild</span></span></div><div><strong>Shop-Token</strong><div class="sub">seltene Event-Belohnung</div></div></div><span class="pill">Loot</span></div>
+          <div class="legend-item"><div class="label"><div class="legend-icon"><span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="https://fortnite-api.com/images/cosmetics/cars/carbody_sandtote/large.png" alt="Fortnite Mercedes-AMG G 63 Originalbild"><span class="asset-fallback">Kein Bild</span></span></div><div><strong>Fahrzeug-Skins</strong><div class="sub">z. B. Mercedes G-Klasse</div></div></div><span class="pill">Kosmetik</span></div>
+          <div class="legend-item"><div class="label"><div class="legend-icon"><span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="https://fortnite-api.com/images/cosmetics/br/pickaxe_spillstrikereward/icon.png" alt="Fortnite Solid Gold Gauntlets Originalicon"><span class="asset-fallback">Kein Bild</span></span></div><div><strong>Spitzhacken</strong><div class="sub">Pickaxe / Tools</div></div></div><span class="pill">Kosmetik</span></div>
+          <div class="legend-item"><div class="label"><div class="legend-icon"><span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="https://fortnite-api.com/images/cosmetics/br/loadingscreen_delilahthw/icon.png" alt="Fortnite Plunder in Paradise Ladebildschirm Originalicon"><span class="asset-fallback">Kein Bild</span></span></div><div><strong>Ladebildschirme</strong><div class="sub">Loading-Screens</div></div></div><span class="pill">Sammlung</span></div>
         </div>
       </section>
     </section>
@@ -98,6 +114,15 @@ footer{padding:18px 4px 0;color:var(--muted);font-size:12px;line-height:1.7}
         <div class="scroll"><table><thead><tr><th>Datum</th><th>Squad / Einzelspieler</th><th class="n">Spieler</th><th class="n">Truhen</th><th class="n">Zerstört</th><th class="n">Erneut</th><th class="n">Treasures</th></tr></thead><tbody id="historyRows"></tbody></table></div>
       </section>
 
+      <section class="card" id="archiveCard">
+        <div class="section-title"><h2>Vollständiges Matcharchiv</h2><span class="sub">Alle gespeicherten Matches, ohne Ablaufdatum</span></div>
+        <div class="scroll"><table><thead><tr><th>Datum</th><th>Spieler</th><th>Modus</th><th class="n">Truhen</th><th class="n">Zerstört</th><th class="n">Munition</th><th class="n">Treasures</th></tr></thead><tbody id="archiveRows"></tbody></table></div>
+        <div class="archive-actions">
+          <div class="pagination"><button class="minor" id="archivePrev">Zurück</button><span class="sub" id="archivePage">–</span><button class="minor" id="archiveNext">Weiter</button></div>
+          <button class="minor" id="downloadCsv">Alle Matches als CSV exportieren</button>
+        </div>
+      </section>
+
       <section class="card">
         <div class="section-title"><h2>Accounts &amp; Gesamtstatistik</h2><span class="sub">pro Account getrennt</span></div>
         <div class="scroll"><table><thead><tr><th>Account</th><th class="n">Matches</th><th class="n">Truhen</th><th class="n">Ø pro Match</th><th class="n">Munitionskisten</th><th class="n">Obstkisten</th><th class="n">Treasures</th></tr></thead><tbody id="accountRows"></tbody></table></div>
@@ -107,7 +132,7 @@ footer{padding:18px 4px 0;color:var(--muted);font-size:12px;line-height:1.7}
     <section class="stack">
       <section class="card">
         <div class="section-title"><h2>Loot-Galerie</h2><span class="sub">zuletzt gefundene Belohnungen</span></div>
-        <div id="treasures" class="loot-grid"></div>
+        <div id="treasures" class="loot-grid"></div><p class="asset-source">Echte Fortnite-Bilder statt erfundener Loot-Symbole. Einige Spezialgegenstände haben noch kein eindeutig auffindbares Bild.</p>
       </section>
 
       <section class="card">
@@ -124,7 +149,7 @@ footer{padding:18px 4px 0;color:var(--muted);font-size:12px;line-height:1.7}
   <button class="minor" id="logout">Verbindung trennen</button>
 </section>
 
-<footer>Keine Verbindung mit Fortnite-Servern. Nur eure eigenen lokalen Replay-Statistiken und optionale Live-Schätzungen werden synchronisiert. <strong>Keine Screenshots, Replay-Dateien oder Epic-Passwörter werden übertragen.</strong></footer>
+<footer>Unabhängiges, nicht von Epic Games unterstütztes Fanprojekt. Portions of the materials used are trademarks and/or copyrighted works of Epic Games, Inc. All rights reserved by Epic. This material is not official and is not endorsed by Epic. <a href="https://legal.epicgames.com/epicgames/fan-art-policy" target="_blank" rel="noopener noreferrer" style="color:#9bdcf7">Epic Fan Content Policy</a>. Echte Bilder werden direkt von externen Quellen geladen. Keine Verbindung mit Fortnite-Servern. Nur eure eigenen lokalen Replay-Statistiken und optionale Live-Schätzungen werden synchronisiert. <strong>Keine Screenshots, Replay-Dateien oder Epic-Passwörter werden übertragen.</strong></footer>
 </main>
 <script>
 'use strict';
@@ -135,18 +160,60 @@ const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replac
 const number=n=>Number(n||0).toLocaleString('de-DE');
 const when=s=>s?new Date(Number(s)*1000).toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'}):'–';
 const sum=(arr,key)=>arr.reduce((a,x)=>a+Number(x?.[key]||0),0);
-function treasureIcon(name){
-  const t=String(name||'').toLowerCase();
-  if(/token|shop/.test(t)) return '🪙';
-  if(/mercedes|g-klasse|g class|vehicle|fahrzeug|car|suv/.test(t)) return '🚗';
-  if(/pickaxe|spitzhack|harvest|hacke/.test(t)) return '⛏️';
-  if(/loading|ladebild|screen|bildschirm/.test(t)) return '🖼️';
-  if(/skin|outfit|kostüm/.test(t)) return '👕';
-  if(/glider|gleiter/.test(t)) return '🪂';
-  if(/wrap/.test(t)) return '🎨';
-  if(/spray|emoji|emoticon/.test(t)) return '😎';
-  return '🎁';
+// Originalbilder: vorhandene Fortnite-Screenshots, keine erfundenen Itemicons.
+const SHOP_TOKEN_IMAGE = 'https://www.vice.com/wp-content/uploads/sites/2/2026/11/fortnite-pirate-shop-token-item.jpg?w=1024';
+const cosmeticCache = new Map();
+const safeImageUrl=(value)=>{
+  try{const u=new URL(value);return u.protocol==='https:' && ['fortnite-api.com','media.fortniteapi.io','www.vice.com'].includes(u.hostname)?u.href:null}
+  catch{return null}
+};
+function artTag(url,label){
+  const clean=safeImageUrl(url);
+  if(!clean)return '<span class="asset-frame img-missing"><span class="asset-fallback">Bild nicht verfügbar</span></span>';
+  return `<span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="${esc(clean)}" alt="${esc(label)}"><span class="asset-fallback">Bild nicht verfügbar</span></span>`;
 }
+function knownArt(item){
+  if(/pirate shop access|piraten.shop|shop.token/i.test(item))return SHOP_TOKEN_IMAGE;
+  if(/mercedes.amg|g.wagon|g.klasse/i.test(item))return 'https://fortnite-api.com/images/cosmetics/cars/carbody_sandtote/large.png';
+  if(/solid.gold.*gauntlet|golden.gauntlet/i.test(item))return 'https://fortnite-api.com/images/cosmetics/br/pickaxe_spillstrikereward/icon.png';
+  if(/plunder in paradise/i.test(item))return 'https://fortnite-api.com/images/cosmetics/br/loadingscreen_delilahthw/icon.png';
+  return null;
+}
+function cleanCosmeticName(item){
+  let name=String(item||'').trim().replace(/\s*\([^)]*\)\s*\??$/g,'').replace(/\s*\?$/,'').trim();
+  if(/pirate shop|gizmo|unbekannt|unknown|treasure handler|token/i.test(name))return null;
+  return name.length>2 && name.length<90 ? name : null;
+}
+function norm(s){return String(s||'').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'')}
+async function findCosmeticImage(rawName){
+  const name=cleanCosmeticName(rawName);
+  if(!name)return null;
+  const key=norm(name);
+  if(cosmeticCache.has(key))return cosmeticCache.get(key);
+  const pending=(async()=>{
+    try{
+      const u='https://fortnite-api.com/v2/cosmetics/br/search?name='+encodeURIComponent(name)+'&matchMethod=full&language=en';
+      const response=await fetch(u,{mode:'cors',credentials:'omit',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(5000)});
+      if(!response.ok)return null;
+      const obj=await response.json();
+      if(obj?.status!==200 || norm(obj?.data?.name)!==key)return null;
+      const images=obj.data.images||{};
+      return safeImageUrl(images.icon||images.smallIcon||images.featured||images.other||'');
+    }catch{return null}
+  })();
+  cosmeticCache.set(key,pending);
+  return pending;
+}
+async function attachCosmeticImages(){
+  for(const element of $('treasures').querySelectorAll('[data-cosmetic-name]')){
+    const name=element.dataset.cosmeticName;
+    const url=await findCosmeticImage(name);
+    if(element.isConnected && url){element.innerHTML=artTag(url,'Fortnite Originalbild: '+name)}
+  }
+}
+document.addEventListener('error',(e)=>{
+  if(e.target?.classList?.contains('fn-asset')) e.target.closest('.asset-frame')?.classList.add('img-missing');
+},true);
 async function req(path, method='GET', body){
  const options={method,headers:{'Authorization':'Bearer '+secret}};
  if(body!==undefined){options.headers['Content-Type']='application/json';options.body=JSON.stringify(body)}
@@ -154,18 +221,27 @@ async function req(path, method='GET', body){
  if(!res.ok)throw new Error(json.error||`HTTP ${res.status}`);return json;
 }
 function table(id,rows,colspan=7){$(id).innerHTML=rows||`<tr><td colspan="${colspan}" class="sub">Noch keine Daten</td></tr>`}
+let lastTreasureSignature = '';
 function renderTreasures(treasures){
+  const sig=JSON.stringify(treasures||[]);
+  if(sig===lastTreasureSignature)return;
+  lastTreasureSignature=sig;
   if(!treasures || !treasures.length){$('treasures').innerHTML='<div class="empty">Noch keine Funde erfasst.</div>';return;}
   const cards=[];
   for(const t of treasures){
     const items=(Array.isArray(t.items)&&t.items.length?t.items:[t.name||'Unbekannter Fund']).slice(0,3);
     for(const item of items){
-      cards.push(`<article class="loot-card"><div class="loot-icon">${treasureIcon(item)}</div><div><div class="loot-name">${esc(item)}</div><div class="small">gefunden von ${esc(t.name)} · ${esc(when(t.started))}</div></div></article>`);
-      if(cards.length>=12) break;
+      const match=knownArt(item);
+      const name=cleanCosmeticName(item);
+      const image=match?artTag(match,'Original Fortnite Shop-Token'):
+                  '<span class="asset-frame img-missing"><span class="asset-fallback">Kein Itembild</span></span>';
+      cards.push(`<article class="loot-card"><div class="loot-icon" ${!match && name?'data-cosmetic-name="'+esc(name)+'"':''}>${image}</div><div><div class="loot-name">${esc(item)}</div><div class="small">gefunden von ${esc(t.name)} · ${esc(when(t.started))}</div></div></article>`);
+      if(cards.length>=12)break;
     }
-    if(cards.length>=12) break;
+    if(cards.length>=12)break;
   }
   $('treasures').innerHTML=cards.join('');
+  void attachCosmeticImages();
 }
 function render(state){
  const round=state.round;
@@ -189,11 +265,34 @@ function render(state){
  table('accountRows',(state.accounts||[]).map(x=>`<tr><td>${esc(x.name)}</td><td class="n">${number(x.matches)}</td><td class="n"><strong>${number(x.chests)}</strong></td><td class="n">${Number(x.matches?x.chests/x.matches:0).toLocaleString('de-DE',{maximumFractionDigits:1})}</td><td class="n">${number(x.ammo)}</td><td class="n">${number(x.food)}</td><td class="n">${number(x.treasures)}</td></tr>`).join(''));
  renderTreasures(state.treasures||[]);
 }
+let archiveOffset=0,archiveCount=0,archiveLimit=30;
+async function loadArchive(){
+  if(!secret)return;
+  try{
+    const result=await req(`/api/matches?offset=${archiveOffset}&limit=${archiveLimit}`);
+    archiveCount=result.total;
+    table('archiveRows',(result.matches||[]).map(x=>`<tr><td>${esc(when(x.started))}</td><td>${esc(x.name)}</td><td>${esc(x.mode)}</td><td class="n">${number(x.chests)}</td><td class="n">${number(x.destroyed)}</td><td class="n">${number(x.ammo)}</td><td class="n">${number(x.treasure_count)}</td></tr>`));
+    $('archivePage').textContent=archiveCount?`${archiveOffset+1}–${Math.min(archiveOffset+archiveLimit,archiveCount)} von ${archiveCount}`:'Keine Matches';
+    $('archivePrev').disabled=archiveOffset<=0;
+    $('archiveNext').disabled=archiveOffset+archiveLimit>=archiveCount;
+  }catch(e){$('archivePage').textContent='Archivfehler: '+e.message;}
+}
+$('archivePrev').onclick=()=>{archiveOffset=Math.max(0,archiveOffset-archiveLimit);void loadArchive()};
+$('archiveNext').onclick=()=>{archiveOffset+=archiveLimit;void loadArchive()};
+$('downloadCsv').onclick=async()=>{
+  try{
+    const response=await fetch('/api/export/matches.csv',{headers:{Authorization:'Bearer '+secret}});
+    if(!response.ok)throw new Error('HTTP '+response.status);
+    const url=URL.createObjectURL(await response.blob());
+    const a=document.createElement('a');a.href=url;a.download='SquadLoot-Matches.csv';document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }catch(e){alert('CSV-Export fehlgeschlagen: '+e.message)}
+};
 function setStatus(good,msg){$('status').innerHTML=`<span class="led ${good?'on':''}"></span><span>${esc(msg)}</span>`}
-let loading=false;
-async function update(){if(!secret||loading)return;loading=true;try{const state=await req('/api/state');render(state);setStatus(true,'Verbunden · automatische Aktualisierung alle 2 Sekunden');$('login').classList.add('hide');$('mainPanel').classList.remove('hide');}catch(e){setStatus(false,e.message);}finally{loading=false}}
-$('connect').onclick=()=>{secret=$('token').value.trim();sessionStorage.setItem('squad-token',secret);update()};
+let loading=false,archiveLoaded=false;
+async function update(){if(!secret||loading)return;loading=true;try{const state=await req('/api/state');render(state);setStatus(true,'Verbunden · automatische Aktualisierung alle 2 Sekunden');$('login').classList.add('hide');$('mainPanel').classList.remove('hide');if(!archiveLoaded){archiveLoaded=true;void loadArchive()}}catch(e){setStatus(false,e.message);}finally{loading=false}}
+$('connect').onclick=()=>{secret=$('token').value.trim();archiveLoaded=false;sessionStorage.setItem('squad-token',secret);update()};
 $('nextRound').onclick=async()=>{if(!confirm('Neue gemeinsame Runde starten? Der vorläufige Zähler wird zurückgesetzt.'))return;try{await req('/api/round/next','POST',{});await update()}catch(e){alert(e.message)}};
-$('logout').onclick=()=>{secret='';sessionStorage.removeItem('squad-token');$('mainPanel').classList.add('hide');$('login').classList.remove('hide');setStatus(false,'Getrennt')};
+$('logout').onclick=()=>{archiveLoaded=false;secret='';sessionStorage.removeItem('squad-token');$('mainPanel').classList.add('hide');$('login').classList.remove('hide');setStatus(false,'Getrennt')};
 if(secret)update();setInterval(update,2000);
 </script></body></html>

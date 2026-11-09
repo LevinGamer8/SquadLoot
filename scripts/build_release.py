@@ -33,7 +33,15 @@ def build(version:str,repository:str,output:pathlib.Path):
     prefix=f'https://github.com/{repository}/releases/download/v{version}/'
     pi_filename=f'SquadLoot-RaspberryPi-Update-v{version}.zip'
     pi_zip=output/pi_filename
-    pi_data=make_zip(pi_zip,{f'SquadLoot-Pi-Server/{rel}':PI/rel for rel in updater.RELEASE_FILES})
+    # v1.3.0 already installed on users' Pis has a strict update-file allowlist.
+    # The first upgrade to 1.3.1 must NOT include newly introduced backup scripts,
+    # otherwise the old updater rejects the entire release before applying it.
+    # The scripts still live in GitHub and the new updater will support them on a
+    # later staged release, after existing Pis have been upgraded.
+    files = updater.RELEASE_FILES
+    if version == '1.3.1':
+        files = files - {'PI_BACKUP.sh', 'PI_BACKUP_AUTOMATISCH.sh'}
+    pi_data=make_zip(pi_zip,{f'SquadLoot-Pi-Server/{rel}':PI/rel for rel in files})
     # Full portable source distribution for first-time setup.
     client_filename=f'SquadLoot-Windows-Client-v{version}.zip'
     client_zip=output/client_filename
@@ -55,7 +63,7 @@ def build(version:str,repository:str,output:pathlib.Path):
         'client_version':version,'client_package_url':prefix+update_filename,
         'client_package_sha256':hashlib.sha256(update_data).hexdigest(),
         'client_package_size':len(update_data),
-        'notes':f'SquadLoot {version}: Live-Schätzungen, neues Desktop-Design, gemeinsame Updates für Pi und Windows',
+        'notes':f'SquadLoot {version}: Vollstaendiges Matcharchiv, CSV und Fortnite-Bilder',
     }
     (output/'latest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     installer=ROOT/'SQUADLOOT_INSTALLIEREN.ps1'

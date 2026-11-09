@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import hmac
 import hashlib
+import csv
+import io
 import json
 import os
 import re
@@ -17,7 +19,7 @@ from datetime import datetime, timezone
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, parse_qs
 
 HOST = os.getenv('SQUAD_BIND', '127.0.0.1')
 PORT = int(os.getenv('SQUAD_PORT', '8765'))
@@ -284,6 +286,43 @@ def get_state():
         return {'time':now,'round':current,'history':history,'accounts':accounts,'treasures':treasures,'total_matches':total_matches}
 
 
+def get_match_archive(limit=50, offset=0):
+    """Page through *all* saved matches. No automatic data expiry exists."""
+    limit = max(1, min(100, int(limit)))
+    offset = max(0, min(10_000_000, int(offset)))
+    with LOCK, database() as db:
+        total = db.execute('SELECT COUNT(*) FROM matches').fetchone()[0]
+        rows = db.execute("""SELECT session_id,name,started,mode,chests,destroyed,reopened,
+            ammo,food,other,treasure_count,treasure_names
+            FROM matches ORDER BY started DESC, client_id ASC LIMIT ? OFFSET ?""",
+            (limit, offset)).fetchall()
+    return {'total': total, 'offset': offset, 'limit': limit,
+            'matches': [dict(r) for r in rows]}
+
+
+def export_matches_csv():
+    """Export every match; protect spreadsheet viewers from formula injection."""
+    def safe_cell(value):
+        if value is None:
+            return ''
+        txt = str(value)
+        if txt.lstrip('\t\r\n ').startswith(('=', '+', '-', '@')):
+            return "'" + txt
+        return txt
+    fields = ('session_id', 'name', 'started', 'mode', 'chests', 'destroyed',
+              'reopened', 'ammo', 'food', 'other', 'treasure_count', 'treasure_names')
+    with LOCK, database() as db:
+        rows = db.execute("""SELECT session_id,name,started,mode,chests,destroyed,reopened,
+            ammo,food,other,treasure_count,treasure_names
+            FROM matches ORDER BY started ASC, client_id ASC""").fetchall()
+    stream = io.StringIO(newline='')
+    writer = csv.writer(stream, delimiter=';')
+    writer.writerow(fields)
+    for row in rows:
+        writer.writerow([safe_cell(row[key]) for key in fields])
+    return ('\ufeff' + stream.getvalue()).encode('utf-8')
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version='SquadLoot/1.0'
     def log_message(self, fmt, *args):
@@ -351,7 +390,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-Type','text/html; charset=utf-8')
             self.send_header('Cache-Control','no-store')
-            self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self'")
+            self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://fortnite-api.com; img-src 'self' https://www.vice.com https://cdn.mos.cms.futurecdn.net https://ik.imagekit.io https://fortnite-api.com https://media.fortniteapi.io")
             self.send_header('Content-Length',str(len(page)))
             self.end_headers()
             self.wfile.write(page)
@@ -359,6 +398,31 @@ class Handler(BaseHTTPRequestHandler):
             self.update_manifest()
         elif path=='/api/client-update/package':
             self.send_update_file()
+        elif path=='/api/matches':
+            if not self.authorized():
+                return
+            params=parse_qs(urlsplit(self.path).query)
+            try:
+                limit=int(params.get('limit',['50'])[0])
+                offset=int(params.get('offset',['0'])[0])
+                if limit < 1 or offset < 0:
+                    raise ValueError('invalid pagination')
+            except (ValueError, OverflowError):
+                self.answer(400,{'error':'Ungueltige Pagination'})
+                return
+            self.answer(200,get_match_archive(limit, offset))
+        elif path=='/api/export/matches.csv':
+            if not self.authorized():
+                return
+            data=export_matches_csv()
+            self.send_response(200)
+            self.send_header('Content-Type','text/csv; charset=utf-8')
+            self.send_header('Content-Disposition','attachment; filename="SquadLoot-Matches.csv"')
+            self.send_header('Cache-Control','no-store')
+            self.send_header('X-Content-Type-Options','nosniff')
+            self.send_header('Content-Length',str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
         elif path=='/api/state':
             if self.authorized():
                 self.answer(200,get_state())

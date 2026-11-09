@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SquadLoot · Fortnite Kisten-Tracker</title>
+<style>
+:root{color-scheme:dark;--bg:#07101a;--bg2:#0b1422;--panel:#132235;--panel2:#101d2f;--line:#29435f;--text:#eef6ff;--muted:#9db2c8;--accent:#67d4ff;--accent2:#7da8ff;--ok:#72e1b3;--gold:#ffc86b;--danger:#ff8d8d;--violet:#c3a8ff;--shadow:0 18px 40px rgba(0,0,0,.22)}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--text);font:15px/1.5 system-ui,Segoe UI,Arial,sans-serif;background:
+radial-gradient(circle at 12% 8%,rgba(69,117,255,.16),transparent 26%),
+radial-gradient(circle at 88% 4%,rgba(95,212,245,.15),transparent 30%),
+linear-gradient(160deg,var(--bg),var(--bg2) 70%)}
+main{max-width:1300px;margin:auto;padding:30px 18px 64px}
+header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;margin-bottom:22px}
+h1{margin:0;font-size:clamp(28px,3.2vw,42px);font-weight:820;letter-spacing:-1.2px}.sub{color:var(--muted);font-size:13px}
+.highlight{background:linear-gradient(120deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.card{background:linear-gradient(145deg,rgba(22,37,58,.97),rgba(12,23,38,.98));border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:var(--shadow);margin-bottom:16px}
+#status{display:flex;align-items:center;gap:8px;background:rgba(18,32,51,.95);border:1px solid var(--line);padding:10px 14px;border-radius:999px;font-weight:700;color:#d7e4f6}.led{width:10px;height:10px;border-radius:50%;display:inline-block;background:#b95c67;box-shadow:0 0 0 4px rgba(185,92,103,.15)}.led.on{background:var(--ok);box-shadow:0 0 0 4px rgba(114,225,179,.18)}
+#login{display:flex;flex-wrap:wrap;gap:10px;align-items:center}#login input{flex:1;min-width:250px}
+input{background:#0a1727;color:var(--text);border:1px solid #34506b;border-radius:10px;padding:12px;min-height:45px}
+button{background:#1d6fa8;color:#fff;border:1px solid #318dc6;border-radius:10px;padding:10px 16px;font-weight:760;cursor:pointer;transition:.15s transform,.15s background}
+button:hover{background:#2980bb;transform:translateY(-1px)}button.minor{background:#182d45;border-color:#36516b}button.minor:hover{background:#203a58}
+.hide{display:none}
+.hero{display:grid;grid-template-columns:1.45fr .95fr;gap:16px;margin-bottom:16px}.hero-card{position:relative;overflow:hidden}.hero-card:before{content:'';position:absolute;inset:auto -10% -30% auto;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(103,212,255,.12),transparent 70%)}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:14px}.kpi{position:relative;overflow:hidden;min-height:136px}.kpi:before{content:'';position:absolute;left:0;top:0;width:100%;height:3px;background:linear-gradient(90deg,var(--accent),transparent)}.kpi:nth-child(2):before{background:linear-gradient(90deg,var(--ok),transparent)}.kpi:nth-child(3):before{background:linear-gradient(90deg,var(--violet),transparent)}.kpi:nth-child(4):before{background:linear-gradient(90deg,var(--gold),transparent)}
+.kpi .metric{display:flex;align-items:center;justify-content:space-between;gap:8px}.kpi strong{display:block;font-size:38px;line-height:1.15;letter-spacing:-1px;margin:8px 0 2px}.icon-badge{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:23px;background:linear-gradient(145deg,rgba(103,212,255,.16),rgba(125,168,255,.08));border:1px solid rgba(125,168,255,.26)}
+.layout{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}.stack{display:grid;gap:16px}
+.section-title{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}.section-title h2{margin:0;font-size:18px;letter-spacing:-.2px}.section-title .sub{font-size:12px}
+.scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:13px 11px;border-bottom:1px solid rgba(135,162,191,.12)}th{font-size:12px;text-transform:uppercase;letter-spacing:.35px;color:#a7bbcf;font-weight:650}tbody tr:hover{background:rgba(112,177,224,.04)}.n{text-align:right;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid rgba(127,168,205,.25);background:rgba(127,168,205,.08);font-size:12px;font-weight:700;color:#bdd0e4}.pill.live{color:#9ee7ff;background:rgba(103,212,255,.11);border-color:rgba(103,212,255,.22)}.pill.ok{color:#9df0c7;background:rgba(114,225,179,.11);border-color:rgba(114,225,179,.2)}
+.loot-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.loot-card{background:linear-gradient(160deg,rgba(19,35,55,.96),rgba(12,21,35,.96));border:1px solid rgba(122,151,183,.18);border-radius:16px;padding:14px;display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center}.loot-card .loot-icon{width:54px;height:54px;border-radius:16px;display:grid;place-items:center;font-size:28px;background:linear-gradient(145deg,rgba(255,200,107,.12),rgba(103,212,255,.10));border:1px solid rgba(255,200,107,.22)}.loot-card .loot-name{font-weight:780}.loot-card .small{font-size:12px;color:var(--muted)}
+.empty{padding:12px 0;color:var(--muted)}
+.chest-grid{display:grid;grid-template-columns:repeat(2,minmax(140px,1fr));gap:12px}.chest-tile{display:flex;align-items:center;gap:12px;padding:14px;border-radius:16px;border:1px solid rgba(119,151,184,.18);background:linear-gradient(145deg,rgba(14,27,43,.9),rgba(9,18,30,.92))}.chest-tile .tile-icon{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:23px;background:rgba(103,212,255,.09);border:1px solid rgba(103,212,255,.18)}.chest-tile strong{display:block;font-size:23px;line-height:1.1}.note{font-size:12px;color:var(--muted)}
+.legend-list{display:grid;gap:10px}.legend-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid rgba(125,156,184,.16);border-radius:14px;background:rgba(10,19,31,.42)}.legend-item .label{display:flex;align-items:center;gap:10px}.legend-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(114,225,179,.08);border:1px solid rgba(114,225,179,.16)}
+footer{padding:18px 4px 0;color:var(--muted);font-size:12px;line-height:1.7}
+@media(max-width:1100px){.hero,.layout{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(2,minmax(150px,1fr))}}
+@media(max-width:700px){main{padding:18px 12px 46px}.kpi-grid,.chest-grid,.loot-grid{grid-template-columns:1fr}.card{padding:16px;border-radius:16px}.kpi strong{font-size:31px}#login input{min-width:unset;width:100%}}
+</style></head>
+<body><main>
+<header>
+  <div>
+    <h1>🎯 SquadLoot <span class="highlight">Command Center</span></h1>
+    <div class="sub">Zero Build · Live-Schätzungen + bestätigte Replay-Werte · Loot-Highlights für dein Squad</div>
+  </div>
+  <div id="status"><span class="led"></span><span>Nicht verbunden</span></div>
+</header>
+
+<section class="card" id="login">
+  <strong>Zugang zum Squad</strong>
+  <input type="password" id="token" autocomplete="off" placeholder="Squad-Token (SQUAD_TOKEN)" aria-label="Squad-Token">
+  <button id="connect">Verbinden</button>
+  <span class="sub">Der Token bleibt nur in diesem Browser-Tab gespeichert.</span>
+</section>
+
+<section id="mainPanel" class="hide">
+  <div class="hero">
+    <section class="card hero-card">
+      <div class="section-title"><h2>Aktuelle Squad-Runde</h2><span class="pill live" id="roundPill">wartet auf Daten</span></div>
+      <div class="kpi-grid" id="kpis">
+        <div class="card kpi"><div class="metric"><span class="sub">Aktuelle Runde</span><span class="icon-badge">🧭</span></div><strong id="round">–</strong><span class="sub" id="roundtime">Noch nicht gestartet</span></div>
+        <div class="card kpi"><div class="metric"><span class="sub">Kisten Squad</span><span class="icon-badge">🧰</span></div><strong id="chests">–</strong><span class="sub" id="confidence">Lade Daten …</span></div>
+        <div class="card kpi"><div class="metric"><span class="sub">Spieler in Runde</span><span class="icon-badge">👥</span></div><strong id="players">–</strong><span class="sub">Alle verbundenen Clients</span></div>
+        <div class="card kpi"><div class="metric"><span class="sub">Bestätigte Matches</span><span class="icon-badge">🏆</span></div><strong id="matches">–</strong><span class="sub">Seit Start des Trackers</span></div>
+      </div>
+    </section>
+
+    <section class="stack">
+      <section class="card">
+        <div class="section-title"><h2>Kisten-Überblick</h2><span class="sub">Live zusammengefasst</span></div>
+        <div class="chest-grid">
+          <div class="chest-tile"><div class="tile-icon">📦</div><div><span class="sub">Gesamt</span><strong id="tileTotal">0</strong></div></div>
+          <div class="chest-tile"><div class="tile-icon">🔫</div><div><span class="sub">Munition</span><strong id="tileAmmo">0</strong></div></div>
+          <div class="chest-tile"><div class="tile-icon">🍎</div><div><span class="sub">Obst / Essen</span><strong id="tileFood">0</strong></div></div>
+          <div class="chest-tile"><div class="tile-icon">💥</div><div><span class="sub">Zerstört</span><strong id="tileDestroyed">0</strong></div></div>
+        </div>
+        <div class="note" style="margin-top:10px">Die Live-Werte sind eine Schätzung aus manuellen Klicks, optionaler Bildschirm-Erkennung und späteren Replay-Bestätigungen.</div>
+      </section>
+
+      <section class="card">
+        <div class="section-title"><h2>Loot-Legende</h2><span class="sub">Schneller Überblick</span></div>
+        <div class="legend-list">
+          <div class="legend-item"><div class="label"><div class="legend-icon">🪙</div><div><strong>Shop-Token</strong><div class="sub">seltene Event-Belohnung</div></div></div><span class="pill">Loot</span></div>
+          <div class="legend-item"><div class="label"><div class="legend-icon">🚗</div><div><strong>Fahrzeug-Skins</strong><div class="sub">z. B. Mercedes G-Klasse</div></div></div><span class="pill">Kosmetik</span></div>
+          <div class="legend-item"><div class="label"><div class="legend-icon">⛏️</div><div><strong>Spitzhacken</strong><div class="sub">Pickaxe / Tools</div></div></div><span class="pill">Kosmetik</span></div>
+          <div class="legend-item"><div class="label"><div class="legend-icon">🖼️</div><div><strong>Ladebildschirme</strong><div class="sub">Loading-Screens</div></div></div><span class="pill">Sammlung</span></div>
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <div class="layout">
+    <section class="stack">
+      <section class="card">
+        <div class="section-title"><h2>Aktuelle Squad-Runde</h2><button class="minor" id="nextRound">Neue Runde starten</button></div>
+        <div class="scroll"><table><thead><tr><th>Spieler</th><th class="n">Vorläufig</th><th class="n">Replay bestätigt</th><th class="n">Munition</th><th class="n">Obst</th><th>Status</th></tr></thead><tbody id="liveRows"></tbody></table></div>
+        <p class="note">Sobald ein Replay ausgewertet wurde, ersetzt dessen bestätigter Wert die Live-Schätzung.</p>
+      </section>
+
+      <section class="card">
+        <div class="section-title"><h2>Letzte Runden</h2><span class="sub">vollständig oder teilweise ausgewertet</span></div>
+        <div class="scroll"><table><thead><tr><th>Datum</th><th>Squad / Einzelspieler</th><th class="n">Spieler</th><th class="n">Truhen</th><th class="n">Zerstört</th><th class="n">Erneut</th><th class="n">Treasures</th></tr></thead><tbody id="historyRows"></tbody></table></div>
+      </section>
+
+      <section class="card">
+        <div class="section-title"><h2>Accounts &amp; Gesamtstatistik</h2><span class="sub">pro Account getrennt</span></div>
+        <div class="scroll"><table><thead><tr><th>Account</th><th class="n">Matches</th><th class="n">Truhen</th><th class="n">Ø pro Match</th><th class="n">Munitionskisten</th><th class="n">Obstkisten</th><th class="n">Treasures</th></tr></thead><tbody id="accountRows"></tbody></table></div>
+      </section>
+    </section>
+
+    <section class="stack">
+      <section class="card">
+        <div class="section-title"><h2>Loot-Galerie</h2><span class="sub">zuletzt gefundene Belohnungen</span></div>
+        <div id="treasures" class="loot-grid"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-title"><h2>Session-Hinweise</h2><span class="sub">Kurz und wichtig</span></div>
+        <div class="legend-list">
+          <div class="legend-item"><div class="label"><div class="legend-icon">📡</div><div><strong>Live verbunden</strong><div class="sub">Client sendet gerade Werte</div></div></div><span class="pill live">online</span></div>
+          <div class="legend-item"><div class="label"><div class="legend-icon">✅</div><div><strong>Replay bestätigt</strong><div class="sub">Match wurde nachträglich ausgewertet</div></div></div><span class="pill ok">bestätigt</span></div>
+          <div class="legend-item"><div class="label"><div class="legend-icon">🔐</div><div><strong>Sicher</strong><div class="sub">nur Zählerdaten, keine Screenshots oder Logins</div></div></div><span class="pill">safe</span></div>
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <button class="minor" id="logout">Verbindung trennen</button>
+</section>
+
+<footer>Keine Verbindung mit Fortnite-Servern. Nur eure eigenen lokalen Replay-Statistiken und optionale Live-Schätzungen werden synchronisiert. <strong>Keine Screenshots, Replay-Dateien oder Epic-Passwörter werden übertragen.</strong></footer>
+</main>
+<script>
+'use strict';
+const $=(id)=>document.getElementById(id);
+let secret=sessionStorage.getItem('squad-token')||'';
+$('token').value=secret;
+const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
+const number=n=>Number(n||0).toLocaleString('de-DE');
+const when=s=>s?new Date(Number(s)*1000).toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'}):'–';
+const sum=(arr,key)=>arr.reduce((a,x)=>a+Number(x?.[key]||0),0);
+function treasureIcon(name){
+  const t=String(name||'').toLowerCase();
+  if(/token|shop/.test(t)) return '🪙';
+  if(/mercedes|g-klasse|g class|vehicle|fahrzeug|car|suv/.test(t)) return '🚗';
+  if(/pickaxe|spitzhack|harvest|hacke/.test(t)) return '⛏️';
+  if(/loading|ladebild|screen|bildschirm/.test(t)) return '🖼️';
+  if(/skin|outfit|kostüm/.test(t)) return '👕';
+  if(/glider|gleiter/.test(t)) return '🪂';
+  if(/wrap/.test(t)) return '🎨';
+  if(/spray|emoji|emoticon/.test(t)) return '😎';
+  return '🎁';
+}
+async function req(path, method='GET', body){
+ const options={method,headers:{'Authorization':'Bearer '+secret}};
+ if(body!==undefined){options.headers['Content-Type']='application/json';options.body=JSON.stringify(body)}
+ const res=await fetch(path,options);let json;try{json=await res.json()}catch{throw new Error('Serverantwort ungültig')}
+ if(!res.ok)throw new Error(json.error||`HTTP ${res.status}`);return json;
+}
+function table(id,rows,colspan=7){$(id).innerHTML=rows||`<tr><td colspan="${colspan}" class="sub">Noch keine Daten</td></tr>`}
+function renderTreasures(treasures){
+  if(!treasures || !treasures.length){$('treasures').innerHTML='<div class="empty">Noch keine Funde erfasst.</div>';return;}
+  const cards=[];
+  for(const t of treasures){
+    const items=(Array.isArray(t.items)&&t.items.length?t.items:[t.name||'Unbekannter Fund']).slice(0,3);
+    for(const item of items){
+      cards.push(`<article class="loot-card"><div class="loot-icon">${treasureIcon(item)}</div><div><div class="loot-name">${esc(item)}</div><div class="small">gefunden von ${esc(t.name)} · ${esc(when(t.started))}</div></div></article>`);
+      if(cards.length>=12) break;
+    }
+    if(cards.length>=12) break;
+  }
+  $('treasures').innerHTML=cards.join('');
+}
+function render(state){
+ const round=state.round;
+ const members=round?.members||[];
+ const totalAmmo=sum(members,'ammo');
+ const totalFood=sum(members,'food');
+ const totalDestroyed=sum(members,'destroyed');
+ $('round').textContent=round?`#${round.id}`:'–';
+ $('roundtime').textContent=round?when(round.created):'Noch nicht gestartet';
+ $('chests').textContent=number(round?.chests_total);
+ $('players').textContent=number(members.length);
+ $('confidence').textContent=round?.provisional?'Vorläufige Zähler enthalten':'Replay-Werte bestätigt / keine Schätzungen';
+ $('matches').textContent=number(state.total_matches);
+ $('roundPill').textContent=round?.provisional?'Live + teilweise vorläufig':'Replay-bestätigt';
+ $('tileTotal').textContent=number(round?.chests_total);
+ $('tileAmmo').textContent=number(totalAmmo);
+ $('tileFood').textContent=number(totalFood);
+ $('tileDestroyed').textContent=number(totalDestroyed);
+ table('liveRows',members.map(x=>`<tr><td><strong>${esc(x.name)}</strong></td><td class="n">${number(x.live_chests)} ${x.vision>x.manual?'<span class="pill">Bildschirm?</span>':''}</td><td class="n">${x.verified_chests===null?'–':`<strong>${number(x.verified_chests)}</strong>`}</td><td class="n">${number(x.ammo)}</td><td class="n">${number(x.food)}</td><td><span class="pill ${x.online?'live':'ok'}">${x.online?'● verbunden':x.verified_chests!==null?'✓ Replay':'nicht aktiv'}</span></td></tr>`).join(''));
+ table('historyRows',(state.history||[]).map(x=>`<tr><td>${esc(when(x.started))}</td><td>${esc(x.breakdown)}</td><td class="n">${number(x.players)}</td><td class="n">${number(x.chests)}</td><td class="n">${number(x.destroyed)}</td><td class="n">${number(x.reopened)}</td><td class="n">${number(x.treasures)}</td></tr>`).join(''));
+ table('accountRows',(state.accounts||[]).map(x=>`<tr><td>${esc(x.name)}</td><td class="n">${number(x.matches)}</td><td class="n"><strong>${number(x.chests)}</strong></td><td class="n">${Number(x.matches?x.chests/x.matches:0).toLocaleString('de-DE',{maximumFractionDigits:1})}</td><td class="n">${number(x.ammo)}</td><td class="n">${number(x.food)}</td><td class="n">${number(x.treasures)}</td></tr>`).join(''));
+ renderTreasures(state.treasures||[]);
+}
+function setStatus(good,msg){$('status').innerHTML=`<span class="led ${good?'on':''}"></span><span>${esc(msg)}</span>`}
+let loading=false;
+async function update(){if(!secret||loading)return;loading=true;try{const state=await req('/api/state');render(state);setStatus(true,'Verbunden · automatische Aktualisierung alle 2 Sekunden');$('login').classList.add('hide');$('mainPanel').classList.remove('hide');}catch(e){setStatus(false,e.message);}finally{loading=false}}
+$('connect').onclick=()=>{secret=$('token').value.trim();sessionStorage.setItem('squad-token',secret);update()};
+$('nextRound').onclick=async()=>{if(!confirm('Neue gemeinsame Runde starten? Der vorläufige Zähler wird zurückgesetzt.'))return;try{await req('/api/round/next','POST',{});await update()}catch(e){alert(e.message)}};
+$('logout').onclick=()=>{secret='';sessionStorage.removeItem('squad-token');$('mainPanel').classList.add('hide');$('login').classList.remove('hide');setStatus(false,'Getrennt')};
+if(secret)update();setInterval(update,2000);
+</script></body></html>

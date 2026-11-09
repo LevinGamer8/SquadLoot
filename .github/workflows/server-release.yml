@@ -1,0 +1,33 @@
+name: Release SquadLoot Pi Server
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Package and publish server update
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Python sources
+        run: |
+          python3 -m compileall -q SquadLoot-Pi-Server
+          python3 -m unittest discover -s tests -v
+      - name: Package release and manifest
+        env:
+          TAG: ${{ github.ref_name }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          python3 scripts/build_release.py --version "$TAG" --repository "$GH_REPO"
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" dist/*.zip dist/latest.json \
+            --latest --verify-tag --title "SquadLoot Server $TAG" \
+            --notes "SquadLoot Pi Server $TAG. Automatische Updates für bestehende Installationen; Datenbank und .env bleiben unverändert."

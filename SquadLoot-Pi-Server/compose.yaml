@@ -1,0 +1,53 @@
+# Pi 5 / Debian 13 / Docker Compose - does not publish any host ports.
+name: squadloot-pi
+services:
+  squadloot:
+    build: ./app
+    restart: unless-stopped
+    environment:
+      SQUAD_TOKEN: ${SQUAD_TOKEN:?SQUAD_TOKEN fehlt in .env}
+      SQUAD_BIND: 0.0.0.0
+      SQUAD_PORT: '8765'
+      SQUAD_DB: /data/squadloot.sqlite3
+      SQUAD_UPDATES_DIR: /updates
+    volumes:
+      - squadloot_data:/data
+      - ./updates:/updates:ro
+    networks:
+      - squadloot_internal
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8765/health',timeout=3)"]
+      interval: 20s
+      timeout: 4s
+      retries: 3
+
+  squadloot-nginx:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    depends_on:
+      squadloot:
+        condition: service_healthy
+    volumes:
+      - ./nginx/squadloot.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - squadloot_internal
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  squadloot_data:
+
+networks:
+  squadloot_internal:
+    internal: true
+  squadloot_egress: {}

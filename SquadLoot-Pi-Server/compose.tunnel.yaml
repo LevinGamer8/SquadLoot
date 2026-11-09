@@ -1,0 +1,14 @@
+# Use together with compose.yaml. cloudflared has the only outbound Internet connection.
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:2026.9.1
+    restart: unless-stopped
+    command: ["tunnel", "run", "--token", "${CF_TUNNEL_TOKEN:?CF_TUNNEL_TOKEN fehlt in .env}"]
+    depends_on:
+      squadloot-nginx:
+        condition: service_healthy
+    networks:
+      - squadloot_internal
+      - squadloot_egress
+    security_opt:
+      - no-new-privileges:true

@@ -1,0 +1,20 @@
+# Never publish configuration/secrets or live user data
+.env
+**/.env
+server-update.conf
+**/server-update.conf
+*.sqlite3
+*.sqlite3-*
+config.json
+__pycache__/
+*.pyc
+.venv/
+.venv*/
+*.log
+.dist/
+dist/
+.server_backups/
+.selfupdate.lock
+.server_update_state.json
+# Local client update bundle; stays private on Pi
+SquadLoot-Pi-Server/updates/

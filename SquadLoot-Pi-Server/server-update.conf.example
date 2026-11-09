@@ -1,0 +1,5 @@
+# SquadLoot: GitHub Releases feed (public repository)
+# For the default GitHub repo of the connected account:
+MANIFEST_URL=https://github.com/LevinGamer8/SquadLoot/releases/latest/download/latest.json
+# Every 6 hours. Updates replace only allowlisted server files, not credentials or DB.
+CHECK_INTERVAL=6h

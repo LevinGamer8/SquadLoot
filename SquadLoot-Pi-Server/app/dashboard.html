@@ -1,298 +1,1290 @@
 <!doctype html>
-<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SquadLoot · Fortnite Kisten-Tracker</title>
+<html lang="de"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex,nofollow">
+<title>SquadLoot · Squad Loot Tracker</title>
 <style>
-:root{color-scheme:dark;--bg:#07101a;--bg2:#0b1422;--panel:#132235;--panel2:#101d2f;--line:#29435f;--text:#eef6ff;--muted:#9db2c8;--accent:#67d4ff;--accent2:#7da8ff;--ok:#72e1b3;--gold:#ffc86b;--danger:#ff8d8d;--violet:#c3a8ff;--shadow:0 18px 40px rgba(0,0,0,.22)}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--text);font:15px/1.5 system-ui,Segoe UI,Arial,sans-serif;background:
-radial-gradient(circle at 12% 8%,rgba(69,117,255,.16),transparent 26%),
-radial-gradient(circle at 88% 4%,rgba(95,212,245,.15),transparent 30%),
-linear-gradient(160deg,var(--bg),var(--bg2) 70%)}
-main{max-width:1300px;margin:auto;padding:30px 18px 64px}
-header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;margin-bottom:22px}
-h1{margin:0;font-size:clamp(28px,3.2vw,42px);font-weight:820;letter-spacing:-1.2px}.sub{color:var(--muted);font-size:13px}
-.highlight{background:linear-gradient(120deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
-.card{background:linear-gradient(145deg,rgba(22,37,58,.97),rgba(12,23,38,.98));border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:var(--shadow);margin-bottom:16px}
-#status{display:flex;align-items:center;gap:8px;background:rgba(18,32,51,.95);border:1px solid var(--line);padding:10px 14px;border-radius:999px;font-weight:700;color:#d7e4f6}.led{width:10px;height:10px;border-radius:50%;display:inline-block;background:#b95c67;box-shadow:0 0 0 4px rgba(185,92,103,.15)}.led.on{background:var(--ok);box-shadow:0 0 0 4px rgba(114,225,179,.18)}
-#login{display:flex;flex-wrap:wrap;gap:10px;align-items:center}#login input{flex:1;min-width:250px}
-input{background:#0a1727;color:var(--text);border:1px solid #34506b;border-radius:10px;padding:12px;min-height:45px}
-button{background:#1d6fa8;color:#fff;border:1px solid #318dc6;border-radius:10px;padding:10px 16px;font-weight:760;cursor:pointer;transition:.15s transform,.15s background}
-button:hover{background:#2980bb;transform:translateY(-1px)}button.minor{background:#182d45;border-color:#36516b}button.minor:hover{background:#203a58}
-.hide{display:none}
-.hero{display:grid;grid-template-columns:1.45fr .95fr;gap:16px;margin-bottom:16px}.hero-card{position:relative;overflow:hidden}.hero-card:before{content:'';position:absolute;inset:auto -10% -30% auto;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(103,212,255,.12),transparent 70%)}
-.kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:14px}.kpi{position:relative;overflow:hidden;min-height:136px}.kpi:before{content:'';position:absolute;left:0;top:0;width:100%;height:3px;background:linear-gradient(90deg,var(--accent),transparent)}.kpi:nth-child(2):before{background:linear-gradient(90deg,var(--ok),transparent)}.kpi:nth-child(3):before{background:linear-gradient(90deg,var(--violet),transparent)}.kpi:nth-child(4):before{background:linear-gradient(90deg,var(--gold),transparent)}
-.kpi .metric{display:flex;align-items:center;justify-content:space-between;gap:8px}.kpi strong{display:block;font-size:38px;line-height:1.15;letter-spacing:-1px;margin:8px 0 2px}.icon-badge{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:23px;background:linear-gradient(145deg,rgba(103,212,255,.16),rgba(125,168,255,.08));border:1px solid rgba(125,168,255,.26)}
-.layout{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}.stack{display:grid;gap:16px}
-.section-title{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}.section-title h2{margin:0;font-size:18px;letter-spacing:-.2px}.section-title .sub{font-size:12px}
-.scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:13px 11px;border-bottom:1px solid rgba(135,162,191,.12)}th{font-size:12px;text-transform:uppercase;letter-spacing:.35px;color:#a7bbcf;font-weight:650}tbody tr:hover{background:rgba(112,177,224,.04)}.n{text-align:right;font-variant-numeric:tabular-nums}
-.pill{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid rgba(127,168,205,.25);background:rgba(127,168,205,.08);font-size:12px;font-weight:700;color:#bdd0e4}.pill.live{color:#9ee7ff;background:rgba(103,212,255,.11);border-color:rgba(103,212,255,.22)}.pill.ok{color:#9df0c7;background:rgba(114,225,179,.11);border-color:rgba(114,225,179,.2)}
-.loot-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.loot-card{background:linear-gradient(160deg,rgba(19,35,55,.96),rgba(12,21,35,.96));border:1px solid rgba(122,151,183,.18);border-radius:16px;padding:14px;display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center}.loot-card .loot-icon{width:54px;height:54px;border-radius:16px;display:grid;place-items:center;font-size:28px;background:linear-gradient(145deg,rgba(255,200,107,.12),rgba(103,212,255,.10));border:1px solid rgba(255,200,107,.22)}.loot-card .loot-name{font-weight:780}.loot-card .small{font-size:12px;color:var(--muted)}
-.empty{padding:12px 0;color:var(--muted)}
-.chest-grid{display:grid;grid-template-columns:repeat(2,minmax(140px,1fr));gap:12px}.chest-tile{display:flex;align-items:center;gap:12px;padding:14px;border-radius:16px;border:1px solid rgba(119,151,184,.18);background:linear-gradient(145deg,rgba(14,27,43,.9),rgba(9,18,30,.92))}.chest-tile .tile-icon{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:23px;background:rgba(103,212,255,.09);border:1px solid rgba(103,212,255,.18)}.chest-tile strong{display:block;font-size:23px;line-height:1.1}.note{font-size:12px;color:var(--muted)}
-.legend-list{display:grid;gap:10px}.legend-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid rgba(125,156,184,.16);border-radius:14px;background:rgba(10,19,31,.42)}.legend-item .label{display:flex;align-items:center;gap:10px}.legend-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(114,225,179,.08);border:1px solid rgba(114,225,179,.16)}
-footer{padding:18px 4px 0;color:var(--muted);font-size:12px;line-height:1.7}
-@media(max-width:1100px){.hero,.layout{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(2,minmax(150px,1fr))}}
-@media(max-width:700px){main{padding:18px 12px 46px}.kpi-grid,.chest-grid,.loot-grid{grid-template-columns:1fr}.card{padding:16px;border-radius:16px}.kpi strong{font-size:31px}#login input{min-width:unset;width:100%}}
+/* ---------------------------------------------------------------
+   SquadLoot design tokens — identical palette, radii and spacing
+   scale as the Windows client. Self-contained: no external fonts,
+   scripts or images, so the strict CSP keeps working.
+   --------------------------------------------------------------- */
+:root{
+  --bg:#080B12; --rail:#0B0F18; --surface:#111724; --surface-2:#161E2E;
+  --surface-3:#1C2638; --field:#0C111B;
+  --line:#202B3D; --line-soft:#1A2333; --line-strong:#2B3850;
+  --text:#E9EEF8; --dim:#97A3B8; --mute:#64718A;
+  --accent:#5B78F0; --accent-hi:#7A92FF; --accent-deep:#38489C;
+  --cyan:#38BDF8; --ok:#34D399; --warn:#F0B429; --bad:#F2787C; --violet:#A78BFA;
+  --tint-accent:rgba(91,120,240,.14); --tint-cyan:rgba(56,189,248,.13);
+  --tint-ok:rgba(52,211,153,.13); --tint-warn:rgba(240,180,41,.13);
+  --tint-bad:rgba(242,120,124,.13); --tint-violet:rgba(167,139,250,.13);
+  --r-card:14px; --r-ctrl:10px; --r-tile:11px;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:24px; --s7:32px;
+  --rail-w:236px;
+  --shadow:0 18px 44px rgba(0,0,0,.34);
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;color:var(--text);background:var(--bg);
+  font:14px/1.55 "Segoe UI Variable Text","Segoe UI",Inter,system-ui,-apple-system,"Noto Sans",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(900px 420px at 18% -8%,rgba(91,120,240,.13),transparent 70%),
+    radial-gradient(760px 380px at 92% -4%,rgba(56,189,248,.09),transparent 70%);
+}
+svg.i{width:1em;height:1em;flex:none;display:block}
+h1,h2,h3{margin:0;letter-spacing:-.01em}
+button{font:inherit;color:inherit}
+a{color:var(--accent-hi)}
+:focus-visible{outline:2px solid var(--accent-hi);outline-offset:2px;border-radius:6px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
-/* Authentische Fortnite-Bilder: externe Quellen, mit Text-Fallback. */
-.asset-frame{position:relative;display:grid;place-items:center;width:100%;height:100%;overflow:hidden;border-radius:inherit;background:rgba(93,148,193,.09)}
-.fn-asset{display:block;width:100%;height:100%;object-fit:cover;object-position:center;max-width:100%}
-.asset-frame .asset-fallback{display:none;color:#9fb7cb;font-size:12px;line-height:1.2;text-align:center;padding:4px}
-.asset-frame.img-missing img{display:none}
-.asset-frame.img-missing .asset-fallback{display:block}
-.icon-badge,.tile-icon,.legend-icon,.loot-icon{padding:0;overflow:hidden;isolation:isolate}
-.loot-icon{flex-shrink:0}
-.loot-card{min-height:86px}
-.loot-card .loot-icon{width:65px;height:65px;border-radius:13px}
-.archive-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px}
-.archive-actions .pagination{display:flex;align-items:center;gap:10px}
-.archive-actions button:disabled{opacity:.45;cursor:default;transform:none}
-.asset-source{font-size:11px;color:var(--muted)}
-.asset-source a{color:#a5dfff;text-decoration:underline}
+/* ---- shell ---------------------------------------------------- */
+.shell{position:relative;z-index:1;display:grid;grid-template-columns:var(--rail-w) 1fr;min-height:100%}
+.rail{
+  background:var(--rail);border-right:1px solid var(--line-soft);
+  display:flex;flex-direction:column;gap:var(--s2);
+  padding:var(--s5) 14px var(--s4);position:sticky;top:0;height:100vh;
+}
+.brand{display:flex;align-items:center;gap:var(--s3);padding:0 var(--s2) var(--s4)}
+.brand .mark{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;
+  background:var(--tint-accent);border:1px solid var(--accent-deep);color:var(--accent-hi);font-size:20px}
+.brand b{display:block;font-size:17px;line-height:1.2}
+.brand span{display:block;font-size:9.5px;font-weight:700;letter-spacing:.09em;color:var(--mute)}
+.rail h2{font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--mute);padding:0 var(--s2) var(--s2)}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{
+  display:flex;align-items:center;gap:var(--s3);width:100%;text-align:left;
+  padding:10px var(--s3);border:0;border-radius:var(--r-ctrl);background:transparent;
+  color:var(--dim);font-size:13px;cursor:pointer;position:relative;
+  transition:background .14s ease,color .14s ease;
+}
+.nav button .i{font-size:16px}
+.nav button:hover{background:var(--surface);color:var(--text)}
+.nav button[aria-current="page"]{background:var(--tint-accent);color:var(--text);font-weight:700}
+.nav button[aria-current="page"]::before{
+  content:"";position:absolute;left:2px;top:26%;bottom:26%;width:3px;border-radius:3px;background:var(--accent-hi)}
+.nav button[aria-current="page"] .i{color:var(--accent-hi)}
+.rail .spacer{flex:1}
+.rail .foot{
+  border:1px solid var(--line);background:var(--surface);border-radius:var(--r-card);
+  padding:var(--s3);font-size:11px;color:var(--mute)}
+.rail .foot b{display:block;color:var(--accent-hi);font-size:15px;margin-top:2px}
+.rail .privacy{display:flex;gap:7px;align-items:flex-start;font-size:10.5px;color:var(--mute);padding:0 var(--s2)}
+
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{
+  display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;
+  padding:var(--s4) var(--s6);position:sticky;top:0;z-index:5;
+  background:linear-gradient(180deg,rgba(8,11,18,.96),rgba(8,11,18,.82));
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--line-soft)}
+.topbar .titles{min-width:0;flex:1}
+.topbar h1{font-size:21px}
+.topbar .titles p{margin:1px 0 0;font-size:11.5px;color:var(--mute)}
+.view{padding:var(--s5) var(--s6) var(--s7);display:none;animation:rise .22s ease both}
+.view.on{display:block}
+@keyframes rise{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---- primitives ------------------------------------------------ */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);
+  padding:var(--s5);box-shadow:var(--shadow)}
+.card.flat{box-shadow:none}
+.card.accent{position:relative;overflow:hidden}
+.card.accent::before{content:"";position:absolute;left:16px;right:16px;top:0;height:2px;border-radius:2px;background:var(--accent)}
+.head{display:flex;align-items:flex-start;gap:var(--s3);margin-bottom:var(--s4);flex-wrap:wrap}
+.head .t{flex:1;min-width:0}
+.head h3{font-size:15px}
+.head p{margin:2px 0 0;font-size:11.5px;color:var(--mute)}
+.grid{display:grid;gap:var(--s3)}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.split{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:var(--s3);align-items:start}
+.stack{display:grid;gap:var(--s3)}
+
+.badge{width:32px;height:32px;border-radius:var(--r-tile);display:grid;place-items:center;font-size:17px;
+  background:var(--tint-accent);border:1px solid rgba(91,120,240,.3);color:var(--accent)}
+.badge.cyan{background:var(--tint-cyan);border-color:rgba(56,189,248,.3);color:var(--cyan)}
+.badge.ok{background:var(--tint-ok);border-color:rgba(52,211,153,.3);color:var(--ok)}
+.badge.warn{background:var(--tint-warn);border-color:rgba(240,180,41,.3);color:var(--warn)}
+.badge.bad{background:var(--tint-bad);border-color:rgba(242,120,124,.3);color:var(--bad)}
+.badge.violet{background:var(--tint-violet);border-color:rgba(167,139,250,.3);color:var(--violet)}
+.badge.sm{width:28px;height:28px;font-size:16px;border-radius:9px}
+
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);padding:var(--s4)}
+.stat .row{display:flex;align-items:center;gap:var(--s3)}
+.stat .lbl{font-size:10px;font-weight:700;letter-spacing:.085em;color:var(--mute);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stat .val{font-size:30px;font-weight:700;letter-spacing:-.025em;margin-top:var(--s3);
+  font-variant-numeric:tabular-nums;line-height:1.08}
+.stat .cap{font-size:11px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.tile{display:flex;align-items:center;gap:var(--s3);background:var(--surface-2);
+  border:1px solid var(--line-soft);border-radius:var(--r-tile);padding:var(--s3) 14px}
+.tile .v{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.15}
+.tile .k{font-size:11px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.pill{display:inline-flex;align-items:center;gap:7px;padding:4px 11px;border-radius:999px;
+  font-size:11.5px;font-weight:700;background:var(--surface-2);border:1px solid var(--line-strong);color:var(--dim);
+  white-space:nowrap}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.pill .i{font-size:12px}
+.pill.ok{color:var(--ok);background:var(--tint-ok);border-color:rgba(52,211,153,.3)}
+.pill.live{color:var(--cyan);background:var(--tint-cyan);border-color:rgba(56,189,248,.3)}
+.pill.warn{color:var(--warn);background:var(--tint-warn);border-color:rgba(240,180,41,.3)}
+.pill.bad{color:var(--bad);background:var(--tint-bad);border-color:rgba(242,120,124,.3)}
+.pill.accent{color:var(--accent-hi);background:var(--tint-accent);border-color:rgba(91,120,240,.3)}
+
+.btn{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:var(--r-ctrl);
+  border:1px solid var(--line-strong);background:var(--surface-3);color:var(--text);
+  font-size:13px;font-weight:600;cursor:pointer;transition:background .14s ease,border-color .14s ease}
+.btn:hover{background:#243049}
+.btn:active{transform:translateY(1px)}
+.btn .i{font-size:15px}
+.btn.primary{background:var(--accent);border-color:var(--accent-deep);color:#fff}
+.btn.primary:hover{background:var(--accent-hi)}
+.btn.ghost{background:transparent;border-color:var(--line);color:var(--dim)}
+.btn.ghost:hover{background:var(--surface-2);color:var(--text)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+
+.meter{height:6px;border-radius:999px;background:var(--surface-3);overflow:hidden}
+.meter > i{display:block;height:100%;border-radius:999px;background:var(--accent);
+  transition:width .35s ease}
+
+input{background:var(--field);color:var(--text);border:1px solid var(--line-strong);
+  border-radius:var(--r-ctrl);padding:10px 12px;font:inherit;min-height:40px;width:100%}
+input:focus{outline:none;border-color:var(--accent)}
+
+/* ---- tables ----------------------------------------------------- */
+.scroll{overflow-x:auto;margin:0 calc(var(--s5) * -1) calc(var(--s5) * -1);padding:0 var(--s5) var(--s5)}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:580px}
+th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+th{font-size:10px;text-transform:uppercase;letter-spacing:.085em;color:var(--mute);font-weight:700}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:rgba(91,120,240,.05)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+td.n b{font-size:14px}
+
+/* ---- player rows ------------------------------------------------ */
+.player{background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--r-tile);
+  padding:var(--s3) 14px;display:grid;gap:10px}
+.player .top{display:flex;align-items:center;gap:var(--s3)}
+.player .av{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+  font-weight:700;font-size:14px;border:1px solid currentColor;position:relative}
+.player .av .on{position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;
+  background:var(--ok);border:2px solid var(--surface-2)}
+.player .who{flex:1;min-width:0}
+.player .who b{display:block;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.player .who span{font-size:11px}
+.player .num{text-align:right}
+.player .num b{display:block;font-size:21px;line-height:1.1;font-variant-numeric:tabular-nums}
+.player .num span{font-size:10px;color:var(--mute)}
+.player .bar{display:flex;align-items:center;gap:var(--s3)}
+.player .bar .meter{flex:1}
+.player .bar em{font-style:normal;font-size:11px;font-weight:700;color:var(--dim);
+  min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
+.player .extra{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:var(--mute)}
+.player .extra span{display:inline-flex;align-items:center;gap:5px}
+.player .extra b{color:var(--dim)}
+
+/* ---- loot gallery ----------------------------------------------- */
+.loot{display:grid;grid-template-columns:repeat(auto-fill,minmax(252px,1fr));gap:var(--s3)}
+.loot article{background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--r-tile);
+  padding:var(--s3);display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--s3);align-items:center;
+  transition:border-color .14s ease,transform .14s ease}
+.loot article:hover{border-color:var(--line-strong);transform:translateY(-1px)}
+.loot .art{width:46px;height:46px;border-radius:var(--r-tile);display:grid;place-items:center;font-size:24px;
+  overflow:hidden;background:var(--tint-violet);border:1px solid rgba(167,139,250,.28);color:var(--violet)}
+.loot .art.tone-cyan{background:var(--tint-cyan);border-color:rgba(56,189,248,.28);color:var(--cyan)}
+.loot .art.tone-ok{background:var(--tint-ok);border-color:rgba(52,211,153,.28);color:var(--ok)}
+.loot .art.tone-warn{background:var(--tint-warn);border-color:rgba(240,180,41,.28);color:var(--warn)}
+.loot .art img{width:100%;height:100%;object-fit:cover;display:block}
+.loot .nm{font-weight:700;font-size:13px;line-height:1.35;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.loot .meta{font-size:11px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.loot .cat{margin-top:4px}
+
+/* ---- legend ------------------------------------------------------ */
+.legend{display:grid;gap:10px}
+.legend .item{display:flex;align-items:center;gap:var(--s3);padding:10px 12px;border-radius:var(--r-tile);
+  border:1px solid var(--line-soft);background:var(--surface-2)}
+.legend .item .t{flex:1;min-width:0}
+.legend .item b{display:block;font-size:12.5px}
+.legend .item span{font-size:11px;color:var(--mute)}
+
+/* ---- states ------------------------------------------------------ */
+.empty{display:grid;justify-items:center;gap:8px;padding:var(--s6) var(--s4);text-align:center}
+.empty .badge{width:44px;height:44px;font-size:21px;border-radius:14px;background:var(--surface-2);
+  border-color:var(--line);color:var(--mute)}
+.empty b{font-size:13px;color:var(--dim)}
+.empty p{margin:0;font-size:11.5px;color:var(--mute);max-width:46ch}
+.skel{border-radius:8px;background:linear-gradient(90deg,var(--surface-2),var(--surface-3),var(--surface-2));
+  background-size:220% 100%;animation:shine 1.5s linear infinite;color:transparent!important}
+@keyframes shine{from{background-position:120% 0}to{background-position:-120% 0}}
+.banner{display:flex;align-items:center;gap:var(--s3);padding:var(--s3) 14px;border-radius:var(--r-ctrl);
+  border:1px solid rgba(242,120,124,.3);background:var(--tint-bad);color:var(--bad);font-size:12.5px;
+  margin-bottom:var(--s4)}
+.banner .t{flex:1;min-width:0}
+.banner.hide{display:none}
+
+/* ---- gate --------------------------------------------------------- */
+.gate{min-height:100vh;display:grid;place-items:center;padding:var(--s5);position:relative;z-index:1}
+.gate .box{width:min(430px,100%);display:grid;gap:var(--s4)}
+.gate .brand{justify-content:center;padding-bottom:0}
+.gate p{margin:0;font-size:12px;color:var(--mute)}
+.gate form{display:grid;gap:var(--s3)}
+.hide{display:none!important}
+
+/* ---- responsive ---------------------------------------------------- */
+@media (max-width:1180px){
+  .g4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .split{grid-template-columns:minmax(0,1fr)}
+  .g3{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:900px){
+  .shell{grid-template-columns:1fr}
+  .rail{position:static;height:auto;flex-direction:row;align-items:center;gap:var(--s3);
+    overflow-x:auto;padding:var(--s3) var(--s4);border-right:0;border-bottom:1px solid var(--line-soft)}
+  .rail h2,.rail .spacer,.rail .foot,.rail .privacy{display:none}
+  .brand{padding:0;flex:none}
+  .brand .txt{display:none}
+  .nav{flex-direction:row;gap:var(--s2)}
+  .nav button{padding:8px 12px;white-space:nowrap}
+  .nav button[aria-current="page"]::before{display:none}
+  .topbar{padding:var(--s3) var(--s4);top:0}
+  .view{padding:var(--s4) var(--s4) var(--s7)}
+}
+@media (max-width:700px){
+  .topbar .titles{flex:1 0 100%}
+}
+@media (max-width:620px){
+  .g4,.g3,.g2{grid-template-columns:minmax(0,1fr)}
+  .card{padding:var(--s4);border-radius:12px}
+  .topbar h1{font-size:18px}
+  .stat .val{font-size:26px}
+  .loot{grid-template-columns:minmax(0,1fr)}
+}
+
+/* v1.4 archive and verified Fortnite asset integration */
+.archive-actions{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:16px}
+.archive-actions .pager{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.archive-actions button:disabled{opacity:.45;cursor:default}
+.archive-message{color:var(--dim);font-size:12px;min-height:18px;margin-top:12px}
+.fortnite-asset{width:100%;height:100%;object-fit:contain;display:block;border-radius:8px}
+.stat .fortnite-asset,.tile .fortnite-asset{width:34px;height:34px;object-fit:cover}
+.loot .art img{width:100%;height:100%;object-fit:contain;display:block}
+@media (max-width:620px){.archive-actions{align-items:flex-start;flex-direction:column}}
 </style></head>
-<body><main>
-<header>
-  <div>
-    <h1>🎯 SquadLoot <span class="highlight">Command Center</span></h1>
-    <div class="sub">Zero Build · Live-Schätzungen + bestätigte Replay-Werte · Loot-Highlights für dein Squad</div>
+<body>
+
+<!-- Icon sprite: inline so the strict CSP (default-src 'self') is satisfied. -->
+<svg class="sr" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><defs>
+<symbol id="s-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></symbol>
+<symbol id="s-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="7.2" r="3.8"/><path d="M3 20.5v-2.9C3 15.6 5 14.6 10 14.6s7 1 7 3v2.9"/><circle cx="18.4" cy="7.4" r="2.8"/><path d="M19 14.6h1.4c1 0 1.6.9 1.6 2v3.9"/></symbol>
+<symbol id="s-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 6.8v5.6l4.2 2.2"/></symbol>
+<symbol id="s-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7.2" r="4"/><path d="M4 21v-3c0-1.8 3.2-3.2 8-3.2s8 1.4 8 3.2v3"/></symbol>
+<symbol id="s-gem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3l8.4 6.4L12 21 3.6 9.4z"/><path d="M3.6 9.4h16.8M12 3L8.4 9.4 12 21M12 3l3.6 6.4L12 21"/></symbol>
+<symbol id="s-chest" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 11V8.2l2.4-2.6h11.2L20 8.2V11"/><rect x="4" y="11" width="16" height="9" rx="1.4"/><path d="M4 14.2h16"/><rect x="10.4" y="11" width="3.2" height="5" rx="1"/></symbol>
+<symbol id="s-chest-rare" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 11V8.2l2.4-2.6h11.2L20 8.2V11"/><rect x="4" y="11" width="16" height="9" rx="1.4"/><path d="M4 14.2h16"/><rect x="10.4" y="11" width="3.2" height="5" rx="1"/><path d="M12 1.6l.9 1.9 1.9.9-1.9.9-.9 1.9-.9-1.9L9.2 4.4l1.9-.9z"/></symbol>
+<symbol id="s-chest-buried" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M5 13V10.4l2.2-2.3h9.6l2.2 2.3V13"/><rect x="5" y="13" width="14" height="6.4" rx="1.3"/><path d="M5 15.6h14"/><path d="M2.4 21.4h19.2"/></symbol>
+<symbol id="s-ammo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 8l8-4 8 4v9l-8 4-8-4z"/><path d="M4 8l8 4.2L20 8M12 12.2V21"/></symbol>
+<symbol id="s-food" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><circle cx="12" cy="14.6" r="6.4"/><path d="M12 8.2V4.6"/><path d="M12 6c1.6-1.8 3.4-2.6 4.6-2.6.2 1.6-.6 3.3-2.3 4.2z"/></symbol>
+<symbol id="s-burst" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none"/><path d="M12 2.6v4.6M12 16.8v4.6M2.6 12h4.6M16.8 12h4.6M5.4 5.4l3.2 3.2M15.4 15.4l3.2 3.2M18.6 5.4l-3.2 3.2M8.6 15.4l-3.2 3.2"/></symbol>
+<symbol id="s-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 12a8.4 8.4 0 1 1-2.6-6.1"/><path d="M20.6 3.8v5h-5"/></symbol>
+<symbol id="s-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.8l4.8 4.8L19 6.4"/></symbol>
+<symbol id="s-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M13.4 2.4L5.4 13.6H11l-.8 8 8.4-11.6H13z"/></symbol>
+<symbol id="s-signal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="18.4" r="1.4" fill="currentColor" stroke="none"/><path d="M8.6 15.2a4.8 4.8 0 0 1 6.8 0"/><path d="M5.6 12a9 9 0 0 1 12.8 0"/><path d="M2.8 9a13 13 0 0 1 18.4 0"/></symbol>
+<symbol id="s-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2.8l8 3.2v6c0 4-3.4 7.2-8 9.2-4.6-2-8-5.2-8-9.2V6z"/></symbol>
+<symbol id="s-film" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3.2" y="5.6" width="17.6" height="12.8" rx="1.8"/><path d="M3.2 10h17.6M3.2 14h17.6M8 5.6v12.8M16 5.6v12.8"/></symbol>
+<symbol id="s-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3.2l2.2 6.6 6.6 2.2-6.6 2.2L12 20.8l-2.2-6.6L3.2 12l6.6-2.2z"/></symbol>
+<symbol id="s-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="13" r="5"/><path d="M11.4 11.6h10M17.4 11.6v3.8M20.4 11.6v3"/></symbol>
+<symbol id="s-logout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14.6 4H6.4A2.4 2.4 0 0 0 4 6.4v11.2A2.4 2.4 0 0 0 6.4 20h8.2"/><path d="M17.4 8.4L21 12l-3.6 3.6M21 12H9.6"/></symbol>
+<symbol id="s-token" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8.4"/><circle cx="12" cy="12" r="4.2"/></symbol>
+<symbol id="s-car" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3 15.6v-2l1.8-4.2A2.4 2.4 0 0 1 7 7.8h10a2.4 2.4 0 0 1 2.2 1.6L21 13.6v2z"/><circle cx="7.2" cy="16.6" r="1.8"/><circle cx="16.8" cy="16.6" r="1.8"/></symbol>
+<symbol id="s-pickaxe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 20L15 9"/><path d="M8.6 4.4c4 .2 8.8 3.2 11 7.4-3-.6-5 .2-6.6 1.6-1.4-3-3.4-5-6.4-6.2z"/></symbol>
+<symbol id="s-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3.2" y="5" width="17.6" height="14" rx="2"/><circle cx="8.6" cy="10" r="1.6"/><path d="M3.6 17l5-4.6 4.4 3.6 3-2.4 4.4 3.6"/></symbol>
+<symbol id="s-shirt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M9 3.6L4 6.2l1.6 4.2 2-0.7V20.4h8.8V9.7l2 .7L20 6.2l-5-2.6a3 3 0 0 1-6 0z"/></symbol>
+<symbol id="s-glider" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2.6 9.6a11 11 0 0 1 18.8 0L12 14.4z"/><path d="M12 14.4v6M9 20.4h6"/></symbol>
+<symbol id="s-gift" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3.4" y="9.4" width="17.2" height="11" rx="1.8"/><path d="M2.6 9.4h18.8M12 9.4v11"/><path d="M12 9.4C10.6 6 9 4.2 7.4 4.2a2.2 2.2 0 0 0 0 4.4h9.2a2.2 2.2 0 0 0 0-4.4C15 4.2 13.4 6 12 9.4z"/></symbol>
+<symbol id="s-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.4v5.4M12 16.2v.1"/></symbol>
+</defs></svg>
+
+<!-- ------------------------------------------------------------- -->
+<main id="gate" class="gate">
+  <div class="box">
+    <div class="brand"><span class="mark"><svg class="i"><use href="#s-gem"/></svg></span>
+      <span class="txt"><b>SquadLoot</b><span>SQUAD TRACKER</span></span></div>
+    <section class="card">
+      <div class="head"><div class="t"><h3>Zugang zum Squad</h3>
+        <p>Der Token bleibt nur in diesem Browser-Tab gespeichert und wird nie geloggt.</p></div></div>
+      <form id="loginForm" autocomplete="off">
+        <label class="sr" for="token">Squad-Token</label>
+        <input type="password" id="token" autocomplete="off" spellcheck="false"
+               placeholder="Squad-Token (SQUAD_TOKEN)">
+        <button class="btn primary" type="submit"><svg class="i"><use href="#s-key"/></svg>Verbinden</button>
+      </form>
+      <div id="gateError" class="banner hide" role="alert" style="margin:16px 0 0">
+        <svg class="i" style="font-size:17px"><use href="#s-alert"/></svg><span class="t"></span></div>
+    </section>
+    <p>Keine Verbindung zu Fortnite-Servern. Es werden ausschließlich eure eigenen
+       Zählwerte angezeigt — keine Screenshots, Replay-Dateien oder Epic-Logins.</p>
   </div>
-  <div id="status"><span class="led"></span><span>Nicht verbunden</span></div>
-</header>
-
-<section class="card" id="login">
-  <strong>Zugang zum Squad</strong>
-  <input type="password" id="token" autocomplete="off" placeholder="Squad-Token (SQUAD_TOKEN)" aria-label="Squad-Token">
-  <button id="connect">Verbinden</button>
-  <span class="sub">Der Token bleibt nur in diesem Browser-Tab gespeichert.</span>
-</section>
-
-<section id="mainPanel" class="hide">
-  <div class="hero">
-    <section class="card hero-card">
-      <div class="section-title"><h2>Aktuelle Squad-Runde</h2><span class="pill live" id="roundPill">wartet auf Daten</span></div>
-      <div class="kpi-grid" id="kpis">
-        <div class="card kpi"><div class="metric"><span class="sub">Aktuelle Runde</span><span class="icon-badge">🧭</span></div><strong id="round">–</strong><span class="sub" id="roundtime">Noch nicht gestartet</span></div>
-        <div class="card kpi"><div class="metric"><span class="sub">Kisten Squad</span><span class="icon-badge"><span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="https://www.vice.com/wp-content/uploads/sites/2/2026/11/fortnite-treasure-hunters-chest.jpg?w=1024" alt="Fortnite Schatztruhen-Grafik"><span class="asset-fallback">Kein Bild</span></span></span></div><strong id="chests">–</strong><span class="sub" id="confidence">Lade Daten …</span></div>
-        <div class="card kpi"><div class="metric"><span class="sub">Spieler in Runde</span><span class="icon-badge">👥</span></div><strong id="players">–</strong><span class="sub">Alle verbundenen Clients</span></div>
-        <div class="card kpi"><div class="metric"><span class="sub">Bestätigte Matches</span><span class="icon-badge">🏆</span></div><strong id="matches">–</strong><span class="sub">Seit Start des Trackers</span></div>
-      </div>
-    </section>
-
-    <section class="stack">
-      <section class="card">
-        <div class="section-title"><h2>Kisten-Überblick</h2><span class="sub">Live zusammengefasst</span></div>
-        <div class="chest-grid">
-          <div class="chest-tile"><div class="tile-icon"><span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="https://www.vice.com/wp-content/uploads/sites/2/2026/11/fortnite-treasure-hunters-chest.jpg?w=1024" alt="Fortnite Schatztruhe"><span class="asset-fallback">Kein Bild</span></span></div><div><span class="sub">Gesamt</span><strong id="tileTotal">0</strong></div></div>
-          <div class="chest-tile"><div class="tile-icon"><span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="https://ik.imagekit.io/0eqydxstn/Fortnite_Battle_Royale/Weapons__Equipment__etc/Overview_Article_Screen_Shots/Ammo_Box_-Sxrkohp-q.png?tr=w-1152" alt="Fortnite Munitionskiste"><span class="asset-fallback">Kein Bild</span></span></div><div><span class="sub">Munition</span><strong id="tileAmmo">0</strong></div></div>
-          <div class="chest-tile"><div class="tile-icon"><span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="https://cdn.mos.cms.futurecdn.net/QufaJhsPjbxPz6qkFnPWxF.jpg" alt="Fortnite NOMS Obst- und Lebensmittelkiste"><span class="asset-fallback">Kein Bild</span></span></div><div><span class="sub">Obst / Essen</span><strong id="tileFood">0</strong></div></div>
-          <div class="chest-tile"><div class="tile-icon"><span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="https://www.vice.com/wp-content/uploads/sites/2/2026/11/fortnite-treasure-hunters-chest.jpg?w=1024" alt="Fortnite Schatztruhe (zerstörte Kisten als Statistik)"><span class="asset-fallback">Kein Bild</span></span></div><div><span class="sub">Zerstört</span><strong id="tileDestroyed">0</strong></div></div>
-        </div>
-        <div class="note" style="margin-top:10px">Die Bildbeispiele stammen aus Fortnite und stellen nicht zwingend exakt den Kistentyp dieser Runde dar. Die Live-Werte sind eine Schätzung aus manuellen Klicks, optionaler Bildschirm-Erkennung und späteren Replay-Bestätigungen.</div>
-      </section>
-
-      <section class="card">
-        <div class="section-title"><h2>Fortnite-Loot</h2><span class="sub">Originalbilder, sofern eindeutig</span></div>
-        <div class="legend-list">
-          <div class="legend-item"><div class="label"><div class="legend-icon"><span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="https://www.vice.com/wp-content/uploads/sites/2/2026/11/fortnite-pirate-shop-token-item.jpg?w=1024" alt="Originales Fortnite Pirate Shop Access Symbol"><span class="asset-fallback">Kein Bild</span></span></div><div><strong>Shop-Token</strong><div class="sub">seltene Event-Belohnung</div></div></div><span class="pill">Loot</span></div>
-          <div class="legend-item"><div class="label"><div class="legend-icon"><span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="https://fortnite-api.com/images/cosmetics/cars/carbody_sandtote/large.png" alt="Fortnite Mercedes-AMG G 63 Originalbild"><span class="asset-fallback">Kein Bild</span></span></div><div><strong>Fahrzeug-Skins</strong><div class="sub">z. B. Mercedes G-Klasse</div></div></div><span class="pill">Kosmetik</span></div>
-          <div class="legend-item"><div class="label"><div class="legend-icon"><span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="https://fortnite-api.com/images/cosmetics/br/pickaxe_spillstrikereward/icon.png" alt="Fortnite Solid Gold Gauntlets Originalicon"><span class="asset-fallback">Kein Bild</span></span></div><div><strong>Spitzhacken</strong><div class="sub">Pickaxe / Tools</div></div></div><span class="pill">Kosmetik</span></div>
-          <div class="legend-item"><div class="label"><div class="legend-icon"><span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="https://fortnite-api.com/images/cosmetics/br/loadingscreen_delilahthw/icon.png" alt="Fortnite Plunder in Paradise Ladebildschirm Originalicon"><span class="asset-fallback">Kein Bild</span></span></div><div><strong>Ladebildschirme</strong><div class="sub">Loading-Screens</div></div></div><span class="pill">Sammlung</span></div>
-        </div>
-      </section>
-    </section>
-  </div>
-
-  <div class="layout">
-    <section class="stack">
-      <section class="card">
-        <div class="section-title"><h2>Aktuelle Squad-Runde</h2><button class="minor" id="nextRound">Neue Runde starten</button></div>
-        <div class="scroll"><table><thead><tr><th>Spieler</th><th class="n">Vorläufig</th><th class="n">Replay bestätigt</th><th class="n">Munition</th><th class="n">Obst</th><th>Status</th></tr></thead><tbody id="liveRows"></tbody></table></div>
-        <p class="note">Sobald ein Replay ausgewertet wurde, ersetzt dessen bestätigter Wert die Live-Schätzung.</p>
-      </section>
-
-      <section class="card">
-        <div class="section-title"><h2>Letzte Runden</h2><span class="sub">vollständig oder teilweise ausgewertet</span></div>
-        <div class="scroll"><table><thead><tr><th>Datum</th><th>Squad / Einzelspieler</th><th class="n">Spieler</th><th class="n">Truhen</th><th class="n">Zerstört</th><th class="n">Erneut</th><th class="n">Treasures</th></tr></thead><tbody id="historyRows"></tbody></table></div>
-      </section>
-
-      <section class="card" id="archiveCard">
-        <div class="section-title"><h2>Vollständiges Matcharchiv</h2><span class="sub">Alle gespeicherten Matches, ohne Ablaufdatum</span></div>
-        <div class="scroll"><table><thead><tr><th>Datum</th><th>Spieler</th><th>Modus</th><th class="n">Truhen</th><th class="n">Zerstört</th><th class="n">Munition</th><th class="n">Treasures</th></tr></thead><tbody id="archiveRows"></tbody></table></div>
-        <div class="archive-actions">
-          <div class="pagination"><button class="minor" id="archivePrev">Zurück</button><span class="sub" id="archivePage">–</span><button class="minor" id="archiveNext">Weiter</button></div>
-          <button class="minor" id="downloadCsv">Alle Matches als CSV exportieren</button>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="section-title"><h2>Accounts &amp; Gesamtstatistik</h2><span class="sub">pro Account getrennt</span></div>
-        <div class="scroll"><table><thead><tr><th>Account</th><th class="n">Matches</th><th class="n">Truhen</th><th class="n">Ø pro Match</th><th class="n">Munitionskisten</th><th class="n">Obstkisten</th><th class="n">Treasures</th></tr></thead><tbody id="accountRows"></tbody></table></div>
-      </section>
-    </section>
-
-    <section class="stack">
-      <section class="card">
-        <div class="section-title"><h2>Loot-Galerie</h2><span class="sub">zuletzt gefundene Belohnungen</span></div>
-        <div id="treasures" class="loot-grid"></div><p class="asset-source">Echte Fortnite-Bilder statt erfundener Loot-Symbole. Einige Spezialgegenstände haben noch kein eindeutig auffindbares Bild.</p>
-      </section>
-
-      <section class="card">
-        <div class="section-title"><h2>Session-Hinweise</h2><span class="sub">Kurz und wichtig</span></div>
-        <div class="legend-list">
-          <div class="legend-item"><div class="label"><div class="legend-icon">📡</div><div><strong>Live verbunden</strong><div class="sub">Client sendet gerade Werte</div></div></div><span class="pill live">online</span></div>
-          <div class="legend-item"><div class="label"><div class="legend-icon">✅</div><div><strong>Replay bestätigt</strong><div class="sub">Match wurde nachträglich ausgewertet</div></div></div><span class="pill ok">bestätigt</span></div>
-          <div class="legend-item"><div class="label"><div class="legend-icon">🔐</div><div><strong>Sicher</strong><div class="sub">nur Zählerdaten, keine Screenshots oder Logins</div></div></div><span class="pill">safe</span></div>
-        </div>
-      </section>
-    </section>
-  </div>
-
-  <button class="minor" id="logout">Verbindung trennen</button>
-</section>
-
-<footer>Unabhängiges, nicht von Epic Games unterstütztes Fanprojekt. Portions of the materials used are trademarks and/or copyrighted works of Epic Games, Inc. All rights reserved by Epic. This material is not official and is not endorsed by Epic. <a href="https://legal.epicgames.com/epicgames/fan-art-policy" target="_blank" rel="noopener noreferrer" style="color:#9bdcf7">Epic Fan Content Policy</a>. Echte Bilder werden direkt von externen Quellen geladen. Keine Verbindung mit Fortnite-Servern. Nur eure eigenen lokalen Replay-Statistiken und optionale Live-Schätzungen werden synchronisiert. <strong>Keine Screenshots, Replay-Dateien oder Epic-Passwörter werden übertragen.</strong></footer>
 </main>
+
+<div id="app" class="shell hide">
+  <aside class="rail">
+    <div class="brand"><span class="mark"><svg class="i"><use href="#s-gem"/></svg></span>
+      <span class="txt"><b>SquadLoot</b><span>SQUAD TRACKER</span></span></div>
+    <h2>Navigation</h2>
+    <nav class="nav" id="nav" aria-label="Hauptnavigation">
+      <button type="button" data-view="overview" aria-current="page"><svg class="i"><use href="#s-grid"/></svg>Übersicht</button>
+      <button type="button" data-view="squad"><svg class="i"><use href="#s-users"/></svg>Squad</button>
+      <button type="button" data-view="history"><svg class="i"><use href="#s-clock"/></svg>Match-Historie</button>
+      <button type="button" data-view="accounts"><svg class="i"><use href="#s-user"/></svg>Accounts</button>
+      <button type="button" data-view="loot"><svg class="i"><use href="#s-gem"/></svg>Loot-Galerie</button>
+    </nav>
+    <div class="spacer"></div>
+    <div class="foot">LIVE-AKTUALISIERUNG<b id="railRound">–</b>
+      <span id="railHint">wartet auf Daten</span></div>
+    <div class="privacy"><svg class="i" style="font-size:13px;margin-top:2px"><use href="#s-shield"/></svg>
+      <span>Keine Game-Mods · Daten nur auf deinem Pi</span></div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="titles"><h1 id="viewTitle">Übersicht</h1><p id="viewSub">Live-Zähler und bestätigte Replay-Werte.</p></div>
+      <span class="pill" id="status"><span class="dot"></span><span>Verbinde …</span></span>
+      <button class="btn ghost" id="logout" type="button" title="Verbindung trennen">
+        <svg class="i"><use href="#s-logout"/></svg>Trennen</button>
+    </header>
+
+    <div id="errorBanner" class="banner hide" role="alert" style="margin:16px 24px 0">
+      <svg class="i" style="font-size:17px"><use href="#s-alert"/></svg>
+      <span class="t"></span>
+      <button class="btn ghost" id="retry" type="button">Erneut versuchen</button>
+    </div>
+
+    <!-- Übersicht -->
+    <section class="view on" id="view-overview">
+      <div class="grid g4" style="margin-bottom:var(--s3)">
+        <div class="stat"><div class="row"><span class="badge"><svg class="i"><use href="#s-film"/></svg></span>
+          <span class="lbl">Aktuelle Runde</span></div>
+          <div class="val skel" id="kRound">–</div><div class="cap" id="kRoundCap">lädt …</div></div>
+        <div class="stat"><div class="row"><span class="badge cyan"><svg class="i"><use href="#s-chest"/></svg></span>
+          <span class="lbl">Kisten Squad</span></div>
+          <div class="val skel" id="kChests">–</div><div class="cap" id="kChestsCap">lädt …</div></div>
+        <div class="stat"><div class="row"><span class="badge ok"><svg class="i"><use href="#s-users"/></svg></span>
+          <span class="lbl">Spieler</span></div>
+          <div class="val skel" id="kPlayers">–</div><div class="cap" id="kPlayersCap">lädt …</div></div>
+        <div class="stat"><div class="row"><span class="badge violet"><svg class="i"><use href="#s-check"/></svg></span>
+          <span class="lbl">Matches</span></div>
+          <div class="val skel" id="kMatches">–</div><div class="cap">vom Replay bestätigt</div></div>
+      </div>
+
+      <div class="split">
+        <section class="card">
+          <div class="head"><div class="t"><h3>Squad in dieser Runde</h3>
+            <p>Bestätigte Replay-Werte ersetzen die Live-Schätzung.</p></div>
+            <span class="pill" id="roundPill"><span class="dot"></span><span>wartet auf Daten</span></span></div>
+          <div class="stack" id="liveCards"></div>
+          <div style="margin-top:var(--s4);display:flex;gap:var(--s2);flex-wrap:wrap">
+            <button class="btn" id="nextRound" type="button">
+              <svg class="i"><use href="#s-spark"/></svg>Neue Runde starten</button>
+            <button class="btn ghost" id="refreshNow" type="button">
+              <svg class="i"><use href="#s-refresh"/></svg>Aktualisieren</button>
+          </div>
+        </section>
+
+        <div class="stack">
+          <section class="card">
+            <div class="head"><div class="t"><h3>Kisten-Überblick</h3><p>Diese Runde, live zusammengefasst.</p></div></div>
+            <div class="grid g2">
+              <div class="tile"><span class="badge sm cyan"><img class="fortnite-asset" loading="lazy" referrerpolicy="no-referrer" src="https://www.vice.com/wp-content/uploads/sites/2/2026/11/fortnite-treasure-hunters-chest.jpg?w=1024" alt="Fortnite Schatztruhe"></span>
+                <div style="min-width:0"><div class="v" id="tTotal">0</div><div class="k">Truhen gesamt</div></div></div>
+              <div class="tile"><span class="badge sm warn"><img class="fortnite-asset" loading="lazy" referrerpolicy="no-referrer" src="https://ik.imagekit.io/0eqydxstn/Fortnite_Battle_Royale/Weapons__Equipment__etc/Overview_Article_Screen_Shots/Ammo_Box_-Sxrkohp-q.png?tr=w-1152" alt="Fortnite Munitionskiste"></span>
+                <div style="min-width:0"><div class="v" id="tAmmo">0</div><div class="k">Munitionskisten</div></div></div>
+              <div class="tile"><span class="badge sm ok"><img class="fortnite-asset" loading="lazy" referrerpolicy="no-referrer" src="https://cdn.mos.cms.futurecdn.net/QufaJhsPjbxPz6qkFnPWxF.jpg" alt="Fortnite Lebensmittelkiste"></span>
+                <div style="min-width:0"><div class="v" id="tFood">0</div><div class="k">Obstkisten</div></div></div>
+              <div class="tile"><span class="badge sm bad"><svg class="i"><use href="#s-burst"/></svg></span>
+                <div style="min-width:0"><div class="v" id="tDestroyed">0</div><div class="k">Zerstört</div></div></div>
+            </div>
+            <p style="margin:var(--s3) 0 0;font-size:11.5px;color:var(--mute)">
+              Live-Werte sind Schätzungen aus manuellen Klicks und optionaler
+              Bildschirmerkennung. Das Replay korrigiert sie nach dem Match.</p>
+          </section>
+
+          <section class="card">
+            <div class="head"><div class="t"><h3>Behälter-Legende</h3><p>Was SquadLoot unterscheidet.</p></div></div>
+            <div class="legend">
+              <div class="item"><span class="badge sm cyan"><svg class="i"><use href="#s-chest"/></svg></span>
+                <div class="t"><b>Standard-Truhe</b><span>normale Kiste auf der Map</span></div></div>
+              <div class="item"><span class="badge sm violet"><svg class="i"><use href="#s-chest-rare"/></svg></span>
+                <div class="t"><b>Seltene Truhe</b><span>Event- und Bosstruhen</span></div></div>
+              <div class="item"><span class="badge sm warn"><svg class="i"><use href="#s-chest-buried"/></svg></span>
+                <div class="t"><b>Vergrabener Schatz</b><span>Buried Treasure</span></div></div>
+              <div class="item"><span class="badge sm bad"><svg class="i"><use href="#s-burst"/></svg></span>
+                <div class="t"><b>Zerstörte Truhe</b><span>aufgebrochen statt geöffnet</span></div></div>
+              <div class="item"><span class="badge sm"><svg class="i"><use href="#s-refresh"/></svg></span>
+                <div class="t"><b>Erneut gefüllt</b><span>im selben Match nochmals geöffnet</span></div></div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <section class="card" style="margin-top:var(--s3)">
+        <div class="head"><div class="t"><h3>Letzte Runden</h3><p>Die drei jüngsten ausgewerteten Matches.</p></div>
+          <button class="btn ghost" data-goto="history" type="button">Alle ansehen</button></div>
+        <div class="stack" id="recentRounds"></div>
+      </section>
+    </section>
+
+    <!-- Squad -->
+    <section class="view" id="view-squad">
+      <section class="card">
+        <div class="head"><div class="t"><h3>Aktuelle Runde</h3>
+          <p>Beitrag jedes Spielers zum Squad-Ergebnis.</p></div>
+          <span class="pill accent" id="squadTotal"><svg class="i"><use href="#s-chest"/></svg><span>0 Truhen</span></span></div>
+        <div class="stack" id="squadCards"></div>
+      </section>
+      <section class="card" style="margin-top:var(--s3)">
+        <div class="head"><div class="t"><h3>Detailtabelle</h3>
+          <p>Vorläufige und bestätigte Werte nebeneinander.</p></div></div>
+        <div class="scroll"><table>
+          <thead><tr><th>Spieler</th><th class="n">Vorläufig</th><th class="n">Replay</th>
+            <th class="n">Munition</th><th class="n">Obst</th><th class="n">Zerstört</th><th>Status</th></tr></thead>
+          <tbody id="liveRows"></tbody></table></div>
+      </section>
+    </section>
+
+    <!-- Historie -->
+    <section class="view" id="view-history">
+      <div class="grid g4" style="margin-bottom:var(--s3)">
+        <div class="tile"><span class="badge sm ok"><svg class="i"><use href="#s-check"/></svg></span>
+          <div style="min-width:0"><div class="v" id="hMatches">0</div><div class="k">Bestätigte Matches</div></div></div>
+        <div class="tile"><span class="badge sm cyan"><svg class="i"><use href="#s-chest"/></svg></span>
+          <div style="min-width:0"><div class="v" id="hChests">0</div><div class="k">Truhen (Historie)</div></div></div>
+        <div class="tile"><span class="badge sm violet"><svg class="i"><use href="#s-gem"/></svg></span>
+          <div style="min-width:0"><div class="v" id="hTreasures">0</div><div class="k">Belohnungen</div></div></div>
+        <div class="tile"><span class="badge sm warn"><svg class="i"><use href="#s-ammo"/></svg></span>
+          <div style="min-width:0"><div class="v" id="hAmmo">0</div><div class="k">Munitionskisten</div></div></div>
+      </div>
+      <section class="card">
+        <div class="head"><div class="t"><h3>Ausgewertete Runden</h3>
+          <p>Die letzten 20 Runden, neueste zuerst.</p></div></div>
+        <div class="scroll"><table>
+          <thead><tr><th>Datum</th><th>Squad</th><th class="n">Spieler</th><th class="n">Truhen</th>
+            <th class="n">Zerstört</th><th class="n">Erneut</th><th class="n">Belohnungen</th></tr></thead>
+          <tbody id="historyRows"></tbody></table></div>
+      </section>
+      <section class="card" id="archiveCard" style="margin-top:var(--s3)">
+        <div class="head"><div class="t"><h3>Vollständiges Matcharchiv</h3>
+          <p>Alle gespeicherten Matches. Ältere Ergebnisse werden nicht automatisch gelöscht.</p></div></div>
+        <div class="scroll"><table>
+          <thead><tr><th>Datum</th><th>Spieler</th><th>Modus</th><th class="n">Truhen</th>
+            <th class="n">Zerstört</th><th class="n">Munition</th><th class="n">Belohnungen</th></tr></thead>
+          <tbody id="archiveRows"></tbody></table></div>
+        <div class="archive-actions">
+          <div class="pager">
+            <button class="btn ghost" id="archivePrev" type="button">Zurück</button>
+            <span class="pill" id="archivePage">Noch keine Daten</span>
+            <button class="btn ghost" id="archiveNext" type="button">Weiter</button>
+          </div>
+          <button class="btn" id="downloadCsv" type="button"><svg class="i"><use href="#s-film"/></svg>CSV exportieren</button>
+        </div>
+        <div id="archiveMessage" class="archive-message" role="status" aria-live="polite"></div>
+      </section>
+    </section>
+
+    <!-- Accounts -->
+    <section class="view" id="view-accounts">
+      <section class="card">
+        <div class="head"><div class="t"><h3>Accounts &amp; Gesamtstatistik</h3>
+          <p>Jeder Epic-Account wird getrennt geführt.</p></div></div>
+        <div class="stack" id="accountCards"></div>
+      </section>
+      <section class="card" style="margin-top:var(--s3)">
+        <div class="head"><div class="t"><h3>Alle Werte</h3><p>Summen über alle ausgewerteten Replays.</p></div></div>
+        <div class="scroll"><table>
+          <thead><tr><th>Account</th><th class="n">Matches</th><th class="n">Truhen</th><th class="n">Ø / Match</th>
+            <th class="n">Munition</th><th class="n">Obst</th><th class="n">Belohnungen</th></tr></thead>
+          <tbody id="accountRows"></tbody></table></div>
+      </section>
+    </section>
+
+    <!-- Loot -->
+    <section class="view" id="view-loot">
+      <section class="card">
+        <div class="head"><div class="t"><h3>Loot-Galerie</h3>
+          <p>Zuletzt gefundene Belohnungen aus euren Replays.</p></div>
+          <span class="pill" id="lootCount"><span class="dot"></span><span>0 Funde</span></span></div>
+        <div class="loot" id="treasures"></div>
+      </section>
+      <section class="card" style="margin-top:var(--s3)">
+        <div class="head"><div class="t"><h3>Kategorien</h3>
+          <p>SquadLoot erkennt die Art der Belohnung am Namen aus dem Replay.</p></div></div>
+        <div class="legend" id="lootLegend"></div>
+      </section>
+    </section>
+
+    <footer style="padding:0 var(--s6) var(--s6);font-size:11.5px;color:var(--mute);line-height:1.7">
+      Keine Verbindung mit Fortnite-Servern. Nur eure eigenen lokalen Replay-Statistiken
+      und optionale Live-Schätzungen werden synchronisiert.
+      <strong>Keine Screenshots, Replay-Dateien oder Epic-Passwörter werden übertragen.</strong>
+    </footer>
+  </div>
+</div>
+
 <script>
 'use strict';
-const $=(id)=>document.getElementById(id);
-let secret=sessionStorage.getItem('squad-token')||'';
-$('token').value=secret;
-const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
-const number=n=>Number(n||0).toLocaleString('de-DE');
-const when=s=>s?new Date(Number(s)*1000).toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'}):'–';
-const sum=(arr,key)=>arr.reduce((a,x)=>a+Number(x?.[key]||0),0);
-// Originalbilder: vorhandene Fortnite-Screenshots, keine erfundenen Itemicons.
-const SHOP_TOKEN_IMAGE = 'https://www.vice.com/wp-content/uploads/sites/2/2026/11/fortnite-pirate-shop-token-item.jpg?w=1024';
-const cosmeticCache = new Map();
-const safeImageUrl=(value)=>{
-  try{const u=new URL(value);return u.protocol==='https:' && ['fortnite-api.com','media.fortniteapi.io','www.vice.com'].includes(u.hostname)?u.href:null}
-  catch{return null}
-};
-function artTag(url,label){
-  const clean=safeImageUrl(url);
-  if(!clean)return '<span class="asset-frame img-missing"><span class="asset-fallback">Bild nicht verfügbar</span></span>';
-  return `<span class="asset-frame"><img class="fn-asset" loading="lazy" referrerpolicy="no-referrer" src="${esc(clean)}" alt="${esc(label)}"><span class="asset-fallback">Bild nicht verfügbar</span></span>`;
+/* -----------------------------------------------------------------
+   SquadLoot dashboard client.
+
+   Safety rules kept from the previous version:
+   * every value coming from the API is written with textContent or as an
+     attribute of an element we created — never as raw HTML,
+   * the squad token lives only in sessionStorage of this tab and is sent
+     in the Authorization header, never logged or put into a URL,
+   * only same-origin requests, so Cloudflare Access and the CSP stay intact.
+
+   Performance: polling pauses while the tab is hidden and backs off when the
+   Pi is unreachable, so an idle dashboard costs close to nothing.
+   ----------------------------------------------------------------- */
+const $ = (id) => document.getElementById(id);
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+const BASE_INTERVAL = 2500;      // ms between polls while visible and healthy
+const MAX_INTERVAL = 30000;      // backoff ceiling while the Pi is unreachable
+
+let secret = '';
+try { secret = sessionStorage.getItem('squad-token') || ''; } catch (e) { secret = ''; }
+
+let timer = null;
+let interval = BASE_INTERVAL;
+let inFlight = false;
+let failures = 0;
+let lastState = null;
+let firstPaintDone = false;
+
+/* ---- tiny DOM helpers: every API value goes in via textContent ----- */
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined && text !== null) node.textContent = String(text);
+  return node;
 }
-function knownArt(item){
-  if(/pirate shop access|piraten.shop|shop.token/i.test(item))return SHOP_TOKEN_IMAGE;
-  if(/mercedes.amg|g.wagon|g.klasse/i.test(item))return 'https://fortnite-api.com/images/cosmetics/cars/carbody_sandtote/large.png';
-  if(/solid.gold.*gauntlet|golden.gauntlet/i.test(item))return 'https://fortnite-api.com/images/cosmetics/br/pickaxe_spillstrikereward/icon.png';
-  if(/plunder in paradise/i.test(item))return 'https://fortnite-api.com/images/cosmetics/br/loadingscreen_delilahthw/icon.png';
+function icon(id, size) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'i');
+  svg.setAttribute('aria-hidden', 'true');
+  if (size) svg.style.fontSize = size;
+  const use = document.createElementNS(SVG_NS, 'use');
+  use.setAttribute('href', '#' + id);
+  svg.appendChild(use);
+  return svg;
+}
+function badge(iconId, tone, small) {
+  const span = el('span', 'badge' + (tone ? ' ' + tone : '') + (small ? ' sm' : ''));
+  span.appendChild(icon(iconId));
+  return span;
+}
+function pill(text, tone, iconId) {
+  const span = el('span', 'pill' + (tone ? ' ' + tone : ''));
+  span.appendChild(iconId ? icon(iconId) : el('span', 'dot'));
+  span.appendChild(el('span', '', text));
+  return span;
+}
+function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+function fill(node, children) {
+  clear(node);
+  for (const child of children) node.appendChild(child);
+}
+function emptyState(iconId, title, text) {
+  const box = el('div', 'empty');
+  box.appendChild(badge(iconId));
+  box.appendChild(el('b', '', title));
+  box.appendChild(el('p', '', text));
+  return box;
+}
+function meter(value, color) {
+  const track = el('div', 'meter');
+  const bar = el('i');
+  bar.style.width = Math.max(0, Math.min(100, value * 100)).toFixed(1) + '%';
+  if (color) bar.style.background = color;
+  track.appendChild(bar);
+  return track;
+}
+
+/* ---- formatting --------------------------------------------------- */
+const number = (n) => Number(n || 0).toLocaleString('de-DE');
+const decimal = (n) => Number(n || 0).toLocaleString('de-DE', { maximumFractionDigits: 1 });
+function shortWhen(stamp) {
+  if (!stamp) return '–';
+  const date = new Date(Number(stamp) * 1000);
+  if (Number.isNaN(date.getTime())) return '–';
+  return date.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+function when(stamp) {
+  if (!stamp) return '–';
+  const date = new Date(Number(stamp) * 1000);
+  if (Number.isNaN(date.getTime())) return '–';
+  return date.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+}
+const sum = (rows, key) => rows.reduce((total, row) => total + Number(row && row[key] || 0), 0);
+const PALETTE = [
+  { tone: 'var(--accent)', cls: '' },
+  { tone: 'var(--cyan)', cls: 'cyan' },
+  { tone: 'var(--violet)', cls: 'violet' },
+  { tone: 'var(--ok)', cls: 'ok' },
+];
+
+/* Counts prefer replay-confirmed values; verified_* fields are optional so an
+   older server keeps working unchanged. */
+function confirmedOr(member, key, liveKey) {
+  const confirmed = member['verified_' + key];
+  return (confirmed === null || confirmed === undefined) ? Number(member[liveKey] || 0) : Number(confirmed);
+}
+function totalsOf(members) {
+  const out = { chests: 0, ammo: 0, food: 0, destroyed: 0, treasures: 0, confirmed: 0, estimated: 0, online: 0 };
+  for (const member of members) {
+    const verified = member.verified_chests;
+    out.chests += (verified === null || verified === undefined) ? Number(member.live_chests || 0) : Number(verified);
+    if (verified === null || verified === undefined) out.estimated++; else out.confirmed++;
+    out.ammo += confirmedOr(member, 'ammo', 'ammo');
+    out.food += confirmedOr(member, 'food', 'food');
+    out.destroyed += confirmedOr(member, 'destroyed', 'destroyed');
+    out.treasures += Number(member.verified_treasures || 0);
+    if (member.online) out.online++;
+  }
+  return out;
+}
+
+/* ---- loot categories ---------------------------------------------- */
+const LOOT_RULES = [
+  { test: /token|shop|v-?bucks|münz|muenz/i, icon: 's-token', cls: 'warn', label: 'Shop-Token',
+    note: 'Event-Währung und Shop-Gutschriften' },
+  { test: /mercedes|g-?klasse|g\s?class|vehicle|fahrzeug|auto|car|suv|truck/i, icon: 's-car', cls: 'cyan',
+    label: 'Fahrzeug', note: 'Fahrzeuge und Fahrzeug-Lackierungen' },
+  { test: /pickaxe|spitzhack|harvest|hacke|erntewerkzeug/i, icon: 's-pickaxe', cls: '',
+    label: 'Spitzhacke', note: 'Erntewerkzeuge' },
+  { test: /loading|ladebild|screen|bildschirm/i, icon: 's-image', cls: 'violet',
+    label: 'Ladebildschirm', note: 'Loading Screens und Sammelbilder' },
+  { test: /skin|outfit|kostüm|kostuem|charakter/i, icon: 's-shirt', cls: 'ok',
+    label: 'Outfit', note: 'Skins und Charaktere' },
+  { test: /glider|gleiter|schirm/i, icon: 's-glider', cls: 'cyan',
+    label: 'Gleiter', note: 'Gleitschirme' },
+  { test: /wrap|folie|lackier/i, icon: 's-image', cls: 'violet',
+    label: 'Wrap', note: 'Waffen- und Fahrzeugfolien' },
+  { test: /spray|emote|emoji|emoticon|tanz/i, icon: 's-spark', cls: 'warn',
+    label: 'Emote / Spray', note: 'Tänze, Sprays und Emotes' },
+  { test: /truhe|chest|coffre/i, icon: 's-chest-rare', cls: 'cyan',
+    label: 'Truhenfund', note: 'Belohnungen direkt aus einer Truhe' },
+];
+const LOOT_FALLBACK = { icon: 's-gift', cls: 'violet', label: 'Belohnung',
+  note: 'alles, was keiner anderen Kategorie entspricht' };
+function lootKind(name) {
+  const text = String(name || '');
+  for (const rule of LOOT_RULES) if (rule.test.test(text)) return rule;
+  return LOOT_FALLBACK;
+}
+
+/* ---- API ----------------------------------------------------------- */
+async function api(path, method, body) {
+  const options = { method: method || 'GET', headers: { 'Authorization': 'Bearer ' + secret } };
+  if (body !== undefined) {
+    options.headers['Content-Type'] = 'application/json';
+    options.body = JSON.stringify(body);
+  }
+  const response = await fetch(path, options);
+  let payload = null;
+  try { payload = await response.json(); } catch (e) { payload = null; }
+  if (!response.ok) {
+    const detail = payload && payload.error ? payload.error : 'HTTP ' + response.status;
+    const error = new Error(detail);
+    error.status = response.status;
+    throw error;
+  }
+  if (payload === null) throw new Error('Serverantwort ungültig');
+  return payload;
+}
+
+/* ---- renderers ------------------------------------------------------ */
+function playerCard(member, total, rank) {
+  const verified = member.verified_chests;
+  const isConfirmed = !(verified === null || verified === undefined);
+  const count = isConfirmed ? Number(verified) : Number(member.live_chests || 0);
+  const online = !!member.online;
+  const theme = (!online && !isConfirmed) ? { tone: 'var(--mute)', cls: '' } : PALETTE[rank % PALETTE.length];
+  const name = String(member.name || 'Spieler');
+
+  const card = el('div', 'player');
+  const top = el('div', 'top');
+  const avatar = el('div', 'av', name.slice(0, 1).toUpperCase());
+  avatar.style.color = theme.tone;
+  avatar.style.background = 'rgba(255,255,255,.03)';
+  if (online) avatar.appendChild(el('span', 'on'));
+  top.appendChild(avatar);
+
+  const who = el('div', 'who');
+  who.appendChild(el('b', '', name));
+  const state = el('span', '', isConfirmed ? 'Replay bestätigt'
+    : (online ? 'Live-Schätzung' : 'Offline · keine Daten'));
+  state.style.color = isConfirmed ? 'var(--ok)' : (online ? 'var(--cyan)' : 'var(--mute)');
+  who.appendChild(state);
+  top.appendChild(who);
+
+  const num = el('div', 'num');
+  const value = el('b', '', number(count));
+  value.style.color = isConfirmed ? 'var(--ok)' : (online ? 'var(--cyan)' : 'var(--mute)');
+  num.appendChild(value);
+  num.appendChild(el('span', '', 'Kisten'));
+  top.appendChild(num);
+  card.appendChild(top);
+
+  const share = total ? count / total : 0;
+  const bar = el('div', 'bar');
+  bar.appendChild(meter(share, theme.tone));
+  bar.appendChild(el('em', '', (share * 100).toFixed(0) + ' %'));
+  card.appendChild(bar);
+
+  const extras = [
+    ['s-ammo', confirmedOr(member, 'ammo', 'ammo'), 'Munition'],
+    ['s-food', confirmedOr(member, 'food', 'food'), 'Obst'],
+    ['s-burst', confirmedOr(member, 'destroyed', 'destroyed'), 'zerstört'],
+    ['s-gem', Number(member.verified_treasures || 0), 'Belohnungen'],
+  ].filter((row) => row[1] > 0);
+  if (extras.length) {
+    const line = el('div', 'extra');
+    for (const [iconId, value2, caption] of extras) {
+      const chip = el('span');
+      chip.appendChild(icon(iconId));
+      chip.appendChild(el('b', '', number(value2)));
+      chip.appendChild(el('span', '', caption));
+      line.appendChild(chip);
+    }
+    card.appendChild(line);
+  }
+  return card;
+}
+
+function roundCard(row) {
+  const card = el('div', 'player');
+  const top = el('div', 'top');
+  const who = el('div', 'who');
+  who.appendChild(el('b', '', when(row.started)));
+  who.appendChild(el('span', '', String(row.breakdown || 'Match').slice(0, 120)));
+  top.appendChild(who);
+  const num = el('div', 'num');
+  const value = el('b', '', number(row.chests));
+  value.style.color = 'var(--accent-hi)';
+  num.appendChild(value);
+  num.appendChild(el('span', '', 'Truhen'));
+  top.appendChild(num);
+  card.appendChild(top);
+
+  const line = el('div', 'extra');
+  for (const [iconId, value2, caption] of [
+    ['s-users', row.players, 'Spieler'],
+    ['s-burst', row.destroyed, 'zerstört'],
+    ['s-refresh', row.reopened, 'erneut'],
+    ['s-ammo', row.ammo, 'Munition'],
+    ['s-gem', row.treasures, 'Belohnungen'],
+  ]) {
+    const chip = el('span');
+    chip.appendChild(icon(iconId));
+    chip.appendChild(el('b', '', number(value2)));
+    chip.appendChild(el('span', '', caption));
+    line.appendChild(chip);
+  }
+  card.appendChild(line);
+  return card;
+}
+
+function accountCard(account, best, rank) {
+  const theme = PALETTE[rank % PALETTE.length];
+  const matches = Number(account.matches || 0);
+  const chests = Number(account.chests || 0);
+  const card = el('div', 'player');
+  const top = el('div', 'top');
+  const mark = badge('s-user', theme.cls, true);
+  top.appendChild(mark);
+  const who = el('div', 'who');
+  who.appendChild(el('b', '', String(account.name || '–')));
+  who.appendChild(el('span', '', matches + (matches === 1 ? ' Match' : ' Matches')));
+  top.appendChild(who);
+  const num = el('div', 'num');
+  const value = el('b', '', number(chests));
+  value.style.color = theme.tone;
+  num.appendChild(value);
+  num.appendChild(el('span', '', 'Truhen'));
+  top.appendChild(num);
+  card.appendChild(top);
+  card.appendChild(meter(best ? chests / best : 0, theme.tone));
+
+  const line = el('div', 'extra');
+  for (const [iconId, value2, caption] of [
+    ['s-spark', decimal(matches ? chests / matches : 0), 'Ø pro Match'],
+    ['s-ammo', number(account.ammo), 'Munition'],
+    ['s-food', number(account.food), 'Obst'],
+    ['s-gem', number(account.treasures), 'Belohnungen'],
+  ]) {
+    const chip = el('span');
+    chip.appendChild(icon(iconId));
+    chip.appendChild(el('b', '', value2));
+    chip.appendChild(el('span', '', caption));
+    line.appendChild(chip);
+  }
+  card.appendChild(line);
+  return card;
+}
+
+/* Explicit, reviewed Fortnite imagery. User-controlled names only select
+   a fixed allowlisted URL; an unrecognized item keeps the vector fallback. */
+function exactFortniteImage(name) {
+  const item = String(name || '').toLowerCase().trim();
+  if (/pirate[ -]?shop|shop[ -]?token|piraten[ -]?shop/.test(item))
+    return 'https://www.vice.com/wp-content/uploads/sites/2/2026/11/fortnite-pirate-shop-token-item.jpg?w=1024';
+  if (/mercedes[ -]?amg|g[ -]?klasse|g[ -]?wagon|g 63/.test(item))
+    return 'https://fortnite-api.com/images/cosmetics/cars/carbody_sandtote/large.png';
+  if (/solid gold gauntlets|golden gauntlets|goldene gauntlets/.test(item))
+    return 'https://fortnite-api.com/images/cosmetics/br/pickaxe_spillstrikereward/icon.png';
+  if (/plunder in paradise/.test(item))
+    return 'https://fortnite-api.com/images/cosmetics/br/loadingscreen_delilahthw/icon.png';
   return null;
 }
-function cleanCosmeticName(item){
-  let name=String(item||'').trim().replace(/\s*\([^)]*\)\s*\??$/g,'').replace(/\s*\?$/,'').trim();
-  if(/pirate shop|gizmo|unbekannt|unknown|treasure handler|token/i.test(name))return null;
-  return name.length>2 && name.length<90 ? name : null;
-}
-function norm(s){return String(s||'').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'')}
-async function findCosmeticImage(rawName){
-  const name=cleanCosmeticName(rawName);
-  if(!name)return null;
-  const key=norm(name);
-  if(cosmeticCache.has(key))return cosmeticCache.get(key);
-  const pending=(async()=>{
-    try{
-      const u='https://fortnite-api.com/v2/cosmetics/br/search?name='+encodeURIComponent(name)+'&matchMethod=full&language=en';
-      const response=await fetch(u,{mode:'cors',credentials:'omit',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(5000)});
-      if(!response.ok)return null;
-      const obj=await response.json();
-      if(obj?.status!==200 || norm(obj?.data?.name)!==key)return null;
-      const images=obj.data.images||{};
-      return safeImageUrl(images.icon||images.smallIcon||images.featured||images.other||'');
-    }catch{return null}
-  })();
-  cosmeticCache.set(key,pending);
-  return pending;
-}
-async function attachCosmeticImages(){
-  for(const element of $('treasures').querySelectorAll('[data-cosmetic-name]')){
-    const name=element.dataset.cosmeticName;
-    const url=await findCosmeticImage(name);
-    if(element.isConnected && url){element.innerHTML=artTag(url,'Fortnite Originalbild: '+name)}
+
+function lootCard(item, finder, stamp) {
+  const kind = lootKind(item && item.name !== undefined ? item.name : item);
+  const name = String((item && item.name !== undefined) ? item.name : item || 'Unbekannter Fund');
+  const article = el('article');
+  const art = el('div', 'art' + (kind.cls ? ' tone-' + kind.cls : ''));
+  // Genuine image only for explicitly matched items, never a guessed one.
+  const candidate = item && typeof item.image === 'string' ? item.image : '';
+  const sameOrigin = /^\/[A-Za-z0-9._\-/]*$/.test(candidate) && !candidate.startsWith('//');
+  const source = sameOrigin ? candidate : exactFortniteImage(name);
+  if (source) {
+    const image = el('img');
+    image.alt = name;
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    image.referrerPolicy = 'no-referrer';
+    image.addEventListener('error', () => { clear(art); art.appendChild(icon(kind.icon)); }, { once: true });
+    image.src = source;
+    art.appendChild(image);
+  } else {
+    art.appendChild(icon(kind.icon));
   }
+  article.appendChild(art);
+
+  const text = el('div');
+  text.style.minWidth = '0';
+  text.appendChild(el('div', 'nm', name));
+  text.appendChild(el('div', 'meta', 'von ' + String(finder || '–') + ' · ' + shortWhen(stamp)));
+  const category = el('div', 'cat');
+  category.appendChild(pill(kind.label, kind.cls === 'warn' ? 'warn' : (kind.cls === 'ok' ? 'ok' : 'accent'), kind.icon));
+  text.appendChild(category);
+  article.appendChild(text);
+  return article;
 }
-document.addEventListener('error',(e)=>{
-  if(e.target?.classList?.contains('fn-asset')) e.target.closest('.asset-frame')?.classList.add('img-missing');
-},true);
-async function req(path, method='GET', body){
- const options={method,headers:{'Authorization':'Bearer '+secret}};
- if(body!==undefined){options.headers['Content-Type']='application/json';options.body=JSON.stringify(body)}
- const res=await fetch(path,options);let json;try{json=await res.json()}catch{throw new Error('Serverantwort ungültig')}
- if(!res.ok)throw new Error(json.error||`HTTP ${res.status}`);return json;
+
+/* Live column: a bolt marks values that came from the beta screen estimate. */
+function estimateCell(member) {
+  const box = el('span');
+  box.style.display = 'inline-flex';
+  box.style.alignItems = 'center';
+  box.style.gap = '6px';
+  if (Number(member.vision || 0) > Number(member.manual || 0)) {
+    const mark = icon('s-bolt');
+    mark.style.color = 'var(--warn)';
+    mark.title = 'enthält Werte der Bildschirmerkennung';
+    box.appendChild(mark);
+  }
+  box.appendChild(el('span', '', number(member.live_chests)));
+  return box;
 }
-function table(id,rows,colspan=7){$(id).innerHTML=rows||`<tr><td colspan="${colspan}" class="sub">Noch keine Daten</td></tr>`}
-let lastTreasureSignature = '';
-function renderTreasures(treasures){
-  const sig=JSON.stringify(treasures||[]);
-  if(sig===lastTreasureSignature)return;
-  lastTreasureSignature=sig;
-  if(!treasures || !treasures.length){$('treasures').innerHTML='<div class="empty">Noch keine Funde erfasst.</div>';return;}
-  const cards=[];
-  for(const t of treasures){
-    const items=(Array.isArray(t.items)&&t.items.length?t.items:[t.name||'Unbekannter Fund']).slice(0,3);
-    for(const item of items){
-      const match=knownArt(item);
-      const name=cleanCosmeticName(item);
-      const image=match?artTag(match,'Original Fortnite Shop-Token'):
-                  '<span class="asset-frame img-missing"><span class="asset-fallback">Kein Itembild</span></span>';
-      cards.push(`<article class="loot-card"><div class="loot-icon" ${!match && name?'data-cosmetic-name="'+esc(name)+'"':''}>${image}</div><div><div class="loot-name">${esc(item)}</div><div class="small">gefunden von ${esc(t.name)} · ${esc(when(t.started))}</div></div></article>`);
-      if(cards.length>=12)break;
+
+function row(cells) {
+  const tr = el('tr');
+  for (const cell of cells) {
+    const td = el('td', cell.cls || '');
+    if (cell.node) td.appendChild(cell.node);
+    else if (cell.strong) td.appendChild(el('b', '', cell.text));
+    else td.textContent = cell.text;
+    tr.appendChild(td);
+  }
+  return tr;
+}
+function emptyRow(tbody, columns, text) {
+  const tr = el('tr');
+  const td = el('td', 'k', text);
+  td.colSpan = columns;
+  td.style.color = 'var(--mute)';
+  tr.appendChild(td);
+  fill(tbody, [tr]);
+}
+
+/* ---- main render ----------------------------------------------------- */
+function setText(id, value) {
+  const node = $(id);
+  node.textContent = value;
+  node.classList.remove('skel');
+}
+
+function render(state) {
+  lastState = state;
+  const round = state.round || null;
+  const members = (round && round.members) || [];
+  const totals = totalsOf(members);
+  const history = state.history || [];
+  const accounts = state.accounts || [];
+  const squadTotal = round ? Number(round.chests_total || totals.chests) : 0;
+
+  setText('kRound', round ? '#' + round.id : '–');
+  setText('kRoundCap', round ? when(round.created) : 'Noch keine Runde gestartet');
+  setText('kChests', number(squadTotal));
+  setText('kChestsCap', members.length
+    ? totals.confirmed + ' bestätigt · ' + totals.estimated + ' geschätzt'
+    : 'Warte auf Spieler');
+  setText('kPlayers', number(members.length));
+  setText('kPlayersCap', members.length ? totals.online + ' davon online' : 'Niemand verbunden');
+  setText('kMatches', number(state.total_matches));
+
+  $('railRound').textContent = round ? 'Runde #' + round.id : 'Keine Runde';
+  $('railHint').textContent = members.length
+    ? members.length + ' Spieler · ' + number(squadTotal) + ' Truhen'
+    : 'wartet auf Daten';
+
+  const provisional = round && round.provisional;
+  fill($('roundPill'), []);
+  const freshPill = pill(
+    !round ? 'wartet auf Daten' : (provisional ? totals.estimated + ' vorläufig' : 'alle bestätigt'),
+    !round ? '' : (provisional ? 'warn' : 'ok'));
+  $('roundPill').replaceWith(Object.assign(freshPill, { id: 'roundPill' }));
+
+  setText('tTotal', number(squadTotal));
+  setText('tAmmo', number(totals.ammo));
+  setText('tFood', number(totals.food));
+  setText('tDestroyed', number(totals.destroyed));
+
+  /* Squad cards (overview shows four, squad tab shows everyone). */
+  const overviewCards = members.slice(0, 4).map((member, index) => playerCard(member, squadTotal, index));
+  fill($('liveCards'), overviewCards.length ? overviewCards
+    : [emptyState('s-users', 'Noch kein Spieler in dieser Runde',
+        'Sobald jemand ein Match startet oder den SquadLoot-Client verbindet, erscheint er hier.')]);
+  const squadCards = members.map((member, index) => playerCard(member, squadTotal, index));
+  fill($('squadCards'), squadCards.length ? squadCards
+    : [emptyState('s-users', 'Keine aktive Squad-Runde',
+        'Startet eine Runde im Windows-Client oder hier über „Neue Runde starten“.')]);
+  const totalPill = pill(number(squadTotal) + ' Truhen', 'accent', 's-chest');
+  $('squadTotal').replaceWith(Object.assign(totalPill, { id: 'squadTotal' }));
+
+  /* Squad table */
+  const liveRows = $('liveRows');
+  if (!members.length) {
+    emptyRow(liveRows, 7, 'Noch keine Spieler in dieser Runde.');
+  } else {
+    fill(liveRows, members.map((member) => {
+      const verified = member.verified_chests;
+      const isConfirmed = !(verified === null || verified === undefined);
+      const status = isConfirmed ? pill('Replay', 'ok') : (member.online ? pill('verbunden', 'live') : pill('nicht aktiv'));
+      return row([
+        { text: String(member.name || '–'), strong: true },
+        { node: estimateCell(member), cls: 'n' },
+        { text: isConfirmed ? number(verified) : '–', cls: 'n', strong: isConfirmed },
+        { text: number(confirmedOr(member, 'ammo', 'ammo')), cls: 'n' },
+        { text: number(confirmedOr(member, 'food', 'food')), cls: 'n' },
+        { text: number(confirmedOr(member, 'destroyed', 'destroyed')), cls: 'n' },
+        { node: status },
+      ]);
+    }));
+  }
+
+  /* History */
+  const recent = history.slice(0, 3).map(roundCard);
+  fill($('recentRounds'), recent.length ? recent
+    : [emptyState('s-film', 'Noch keine ausgewertete Runde',
+        'Nach dem Match wertet ChestCounter das Replay aus. Danach erscheinen hier bestätigte Werte.')]);
+  setText('hMatches', number(state.total_matches));
+  setText('hChests', number(sum(history, 'chests')));
+  setText('hTreasures', number(sum(accounts, 'treasures')));
+  setText('hAmmo', number(sum(accounts, 'ammo')));
+  const historyRows = $('historyRows');
+  if (!history.length) {
+    emptyRow(historyRows, 7, 'Noch keine ausgewerteten Matches vorhanden.');
+  } else {
+    fill(historyRows, history.map((item) => row([
+      { text: when(item.started) },
+      { text: String(item.breakdown || '–') },
+      { text: number(item.players), cls: 'n' },
+      { text: number(item.chests), cls: 'n', strong: true },
+      { text: number(item.destroyed), cls: 'n' },
+      { text: number(item.reopened), cls: 'n' },
+      { text: number(item.treasures), cls: 'n' },
+    ])));
+  }
+
+  /* Accounts */
+  const best = accounts.reduce((max, account) => Math.max(max, Number(account.chests || 0)), 0);
+  const accountNodes = accounts.map((account, index) => accountCard(account, best, index));
+  fill($('accountCards'), accountNodes.length ? accountNodes
+    : [emptyState('s-user', 'Noch keine Account-Statistik',
+        'Nach der ersten Replay-Auswertung erscheint hier jeder Epic-Account getrennt.')]);
+  const accountRows = $('accountRows');
+  if (!accounts.length) {
+    emptyRow(accountRows, 7, 'Noch keine Replay-Daten vorhanden.');
+  } else {
+    fill(accountRows, accounts.map((account) => {
+      const matches = Number(account.matches || 0);
+      const chests = Number(account.chests || 0);
+      return row([
+        { text: String(account.name || '–'), strong: true },
+        { text: number(matches), cls: 'n' },
+        { text: number(chests), cls: 'n', strong: true },
+        { text: decimal(matches ? chests / matches : 0), cls: 'n' },
+        { text: number(account.ammo), cls: 'n' },
+        { text: number(account.food), cls: 'n' },
+        { text: number(account.treasures), cls: 'n' },
+      ]);
+    }));
+  }
+
+  /* Loot gallery */
+  const cards = [];
+  for (const treasure of (state.treasures || [])) {
+    const items = (Array.isArray(treasure.items) && treasure.items.length)
+      ? treasure.items : [treasure.name || 'Unbekannter Fund'];
+    for (const item of items.slice(0, 4)) {
+      cards.push(lootCard(item, treasure.name, treasure.started));
+      if (cards.length >= 24) break;
     }
-    if(cards.length>=12)break;
+    if (cards.length >= 24) break;
   }
-  $('treasures').innerHTML=cards.join('');
-  void attachCosmeticImages();
+  fill($('treasures'), cards.length ? cards
+    : [emptyState('s-gem', 'Noch keine Belohnung erfasst',
+        'Sobald ein Replay eine Belohnung enthält, erscheint sie hier mit Kategorie, Finder und Zeitpunkt.')]);
+  const countPill = pill(cards.length + (cards.length === 1 ? ' Fund' : ' Funde'),
+    cards.length ? 'accent' : '');
+  $('lootCount').replaceWith(Object.assign(countPill, { id: 'lootCount' }));
+
+  if (!$('lootLegend').childElementCount) {
+    fill($('lootLegend'), LOOT_RULES.concat([LOOT_FALLBACK]).map((rule) => {
+      const item = el('div', 'item');
+      item.appendChild(badge(rule.icon, rule.cls, true));
+      const text = el('div', 't');
+      text.appendChild(el('b', '', rule.label));
+      text.appendChild(el('span', '', rule.note || 'wird am Namen aus dem Replay erkannt'));
+      item.appendChild(text);
+      return item;
+    }));
+  }
+
+  firstPaintDone = true;
 }
-function render(state){
- const round=state.round;
- const members=round?.members||[];
- const totalAmmo=sum(members,'ammo');
- const totalFood=sum(members,'food');
- const totalDestroyed=sum(members,'destroyed');
- $('round').textContent=round?`#${round.id}`:'–';
- $('roundtime').textContent=round?when(round.created):'Noch nicht gestartet';
- $('chests').textContent=number(round?.chests_total);
- $('players').textContent=number(members.length);
- $('confidence').textContent=round?.provisional?'Vorläufige Zähler enthalten':'Replay-Werte bestätigt / keine Schätzungen';
- $('matches').textContent=number(state.total_matches);
- $('roundPill').textContent=round?.provisional?'Live + teilweise vorläufig':'Replay-bestätigt';
- $('tileTotal').textContent=number(round?.chests_total);
- $('tileAmmo').textContent=number(totalAmmo);
- $('tileFood').textContent=number(totalFood);
- $('tileDestroyed').textContent=number(totalDestroyed);
- table('liveRows',members.map(x=>`<tr><td><strong>${esc(x.name)}</strong></td><td class="n">${number(x.live_chests)} ${x.vision>x.manual?'<span class="pill">Bildschirm?</span>':''}</td><td class="n">${x.verified_chests===null?'–':`<strong>${number(x.verified_chests)}</strong>`}</td><td class="n">${number(x.ammo)}</td><td class="n">${number(x.food)}</td><td><span class="pill ${x.online?'live':'ok'}">${x.online?'● verbunden':x.verified_chests!==null?'✓ Replay':'nicht aktiv'}</span></td></tr>`).join(''));
- table('historyRows',(state.history||[]).map(x=>`<tr><td>${esc(when(x.started))}</td><td>${esc(x.breakdown)}</td><td class="n">${number(x.players)}</td><td class="n">${number(x.chests)}</td><td class="n">${number(x.destroyed)}</td><td class="n">${number(x.reopened)}</td><td class="n">${number(x.treasures)}</td></tr>`).join(''));
- table('accountRows',(state.accounts||[]).map(x=>`<tr><td>${esc(x.name)}</td><td class="n">${number(x.matches)}</td><td class="n"><strong>${number(x.chests)}</strong></td><td class="n">${Number(x.matches?x.chests/x.matches:0).toLocaleString('de-DE',{maximumFractionDigits:1})}</td><td class="n">${number(x.ammo)}</td><td class="n">${number(x.food)}</td><td class="n">${number(x.treasures)}</td></tr>`).join(''));
- renderTreasures(state.treasures||[]);
+
+/* Full match archive: on-demand pagination rather than polling all games. */
+let archiveOffset = 0, archiveTotal = 0, archiveBusy = false, archiveLoaded = false;
+const archiveLimit = 30;
+async function loadArchive() {
+  if (!secret || archiveBusy) return;
+  archiveBusy = true;
+  const prev = $('archivePrev'), next = $('archiveNext');
+  prev.disabled = true;
+  next.disabled = true;
+  $('archiveMessage').textContent = 'Lade Matcharchiv …';
+  try {
+    const result = await api('/api/matches?limit=' + archiveLimit + '&offset=' + archiveOffset);
+    const matches = Array.isArray(result.matches) ? result.matches : [];
+    archiveTotal = Number(result.total || 0);
+    archiveLoaded = true;
+    if (!matches.length) emptyRow($('archiveRows'), 7, 'Noch keine Matches in diesem Bereich.');
+    else fill($('archiveRows'), matches.map(m => row([
+      { text: when(m.started) }, { text: String(m.name || '–'), strong: true },
+      { text: String(m.mode || '–') }, { text: number(m.chests), cls: 'n', strong: true },
+      { text: number(m.destroyed), cls: 'n' }, { text: number(m.ammo), cls: 'n' },
+      { text: number(m.treasure_count), cls: 'n' },
+    ])));
+    $('archivePage').textContent = archiveTotal
+      ? (archiveOffset + 1) + '–' + Math.min(archiveOffset + archiveLimit, archiveTotal) + ' von ' + archiveTotal
+      : 'Keine Matches';
+    $('archiveMessage').textContent = 'Alle Matches sind gespeichert, auch die nicht angezeigten.';
+    prev.disabled = archiveOffset <= 0;
+    next.disabled = archiveOffset + archiveLimit >= archiveTotal;
+  } catch (err) {
+    archiveLoaded = false;
+    $('archiveMessage').textContent = 'Archivfehler: ' + err.message;
+    prev.disabled = archiveOffset <= 0;
+    next.disabled = archiveTotal <= 0 || archiveOffset + archiveLimit >= archiveTotal;
+  } finally { archiveBusy = false; }
 }
-let archiveOffset=0,archiveCount=0,archiveLimit=30;
-async function loadArchive(){
-  if(!secret)return;
-  try{
-    const result=await req(`/api/matches?offset=${archiveOffset}&limit=${archiveLimit}`);
-    archiveCount=result.total;
-    table('archiveRows',(result.matches||[]).map(x=>`<tr><td>${esc(when(x.started))}</td><td>${esc(x.name)}</td><td>${esc(x.mode)}</td><td class="n">${number(x.chests)}</td><td class="n">${number(x.destroyed)}</td><td class="n">${number(x.ammo)}</td><td class="n">${number(x.treasure_count)}</td></tr>`));
-    $('archivePage').textContent=archiveCount?`${archiveOffset+1}–${Math.min(archiveOffset+archiveLimit,archiveCount)} von ${archiveCount}`:'Keine Matches';
-    $('archivePrev').disabled=archiveOffset<=0;
-    $('archiveNext').disabled=archiveOffset+archiveLimit>=archiveCount;
-  }catch(e){$('archivePage').textContent='Archivfehler: '+e.message;}
+$('archivePrev').addEventListener('click', () => {
+  archiveOffset = Math.max(0, archiveOffset - archiveLimit);
+  void loadArchive();
+});
+$('archiveNext').addEventListener('click', () => {
+  if (archiveOffset + archiveLimit < archiveTotal) {
+    archiveOffset += archiveLimit;
+    void loadArchive();
+  }
+});
+$('downloadCsv').addEventListener('click', async () => {
+  const button = $('downloadCsv');
+  button.disabled = true;
+  $('archiveMessage').textContent = 'CSV-Export wird erstellt …';
+  try {
+    const response = await fetch('/api/export/matches.csv', {
+      headers: { 'Authorization': 'Bearer ' + secret }
+    });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const fileUrl = URL.createObjectURL(await response.blob());
+    const link = document.createElement('a');
+    link.href = fileUrl;
+    link.download = 'SquadLoot-Matches.csv';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(fileUrl), 1500);
+    $('archiveMessage').textContent = 'CSV wurde heruntergeladen.';
+  } catch (err) { $('archiveMessage').textContent = 'Exportfehler: ' + err.message; }
+  finally { button.disabled = false; }
+});
+
+/* ---- status, errors, polling ----------------------------------------- */
+function setStatus(tone, text, iconId) {
+  const node = pill(text, tone, iconId);
+  node.id = 'status';
+  $('status').replaceWith(node);
 }
-$('archivePrev').onclick=()=>{archiveOffset=Math.max(0,archiveOffset-archiveLimit);void loadArchive()};
-$('archiveNext').onclick=()=>{archiveOffset+=archiveLimit;void loadArchive()};
-$('downloadCsv').onclick=async()=>{
-  try{
-    const response=await fetch('/api/export/matches.csv',{headers:{Authorization:'Bearer '+secret}});
-    if(!response.ok)throw new Error('HTTP '+response.status);
-    const url=URL.createObjectURL(await response.blob());
-    const a=document.createElement('a');a.href=url;a.download='SquadLoot-Matches.csv';document.body.appendChild(a);a.click();a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),1000);
-  }catch(e){alert('CSV-Export fehlgeschlagen: '+e.message)}
+function showError(message) {
+  const banner = $('errorBanner');
+  banner.querySelector('.t').textContent = message;
+  banner.classList.remove('hide');
+}
+function hideError() { $('errorBanner').classList.add('hide'); }
+
+function schedule(delay) {
+  if (timer) clearTimeout(timer);
+  timer = setTimeout(tick, delay);
+}
+
+async function tick() {
+  if (!secret || inFlight) { schedule(interval); return; }
+  if (document.hidden) { schedule(BASE_INTERVAL); return; }   // no polling in background tabs
+  inFlight = true;
+  try {
+    const state = await api('/api/state');
+    failures = 0;
+    interval = BASE_INTERVAL;
+    hideError();
+    render(state);
+    setStatus('ok', 'Verbunden · live', 's-signal');
+    showApp();
+  } catch (error) {
+    failures++;
+    if (error.status === 401) {
+      interval = BASE_INTERVAL;
+      setStatus('bad', 'Token abgelehnt');
+      logout('Der Squad-Token wurde abgelehnt. Bitte erneut eingeben.');
+      inFlight = false;
+      return;
+    }
+    interval = Math.min(MAX_INTERVAL, BASE_INTERVAL * Math.pow(2, Math.min(4, failures)));
+    setStatus('bad', failures > 1 ? 'Offline · neuer Versuch läuft' : 'Verbindung gestört');
+    if (firstPaintDone) {
+      showError('Dein Pi ist gerade nicht erreichbar (' + error.message +
+        '). Die zuletzt empfangenen Werte bleiben sichtbar; SquadLoot versucht es automatisch erneut.');
+    } else {
+      showError('Verbindung zum SquadLoot-Server fehlgeschlagen: ' + error.message);
+    }
+  } finally {
+    inFlight = false;
+    schedule(interval);
+  }
+}
+
+function showApp() {
+  $('gate').classList.add('hide');
+  $('app').classList.remove('hide');
+}
+function logout(message) {
+  secret = '';
+  try { sessionStorage.removeItem('squad-token'); } catch (e) { /* private mode */ }
+  lastState = null;
+  firstPaintDone = false;
+  archiveLoaded = false;
+  archiveOffset = 0;
+  $('app').classList.add('hide');
+  $('gate').classList.remove('hide');
+  const gateError = $('gateError');
+  if (message) { gateError.querySelector('.t').textContent = message; gateError.classList.remove('hide'); }
+  else gateError.classList.add('hide');
+  if (timer) clearTimeout(timer);
+}
+
+/* ---- navigation -------------------------------------------------------- */
+const VIEWS = {
+  overview: ['Übersicht', 'Live-Zähler und bestätigte Replay-Werte.'],
+  squad: ['Squad', 'Wer trägt wie viel zum Squad-Ergebnis bei.'],
+  history: ['Match-Historie', 'Alle vom Replay bestätigten Runden.'],
+  accounts: ['Accounts', 'Gesamtstatistik pro Epic-Account.'],
+  loot: ['Loot-Galerie', 'Belohnungen aus euren ausgewerteten Replays.'],
 };
-function setStatus(good,msg){$('status').innerHTML=`<span class="led ${good?'on':''}"></span><span>${esc(msg)}</span>`}
-let loading=false,archiveLoaded=false;
-async function update(){if(!secret||loading)return;loading=true;try{const state=await req('/api/state');render(state);setStatus(true,'Verbunden · automatische Aktualisierung alle 2 Sekunden');$('login').classList.add('hide');$('mainPanel').classList.remove('hide');if(!archiveLoaded){archiveLoaded=true;void loadArchive()}}catch(e){setStatus(false,e.message);}finally{loading=false}}
-$('connect').onclick=()=>{secret=$('token').value.trim();archiveLoaded=false;sessionStorage.setItem('squad-token',secret);update()};
-$('nextRound').onclick=async()=>{if(!confirm('Neue gemeinsame Runde starten? Der vorläufige Zähler wird zurückgesetzt.'))return;try{await req('/api/round/next','POST',{});await update()}catch(e){alert(e.message)}};
-$('logout').onclick=()=>{archiveLoaded=false;secret='';sessionStorage.removeItem('squad-token');$('mainPanel').classList.add('hide');$('login').classList.remove('hide');setStatus(false,'Getrennt')};
-if(secret)update();setInterval(update,2000);
-</script></body></html>
+function showView(key) {
+  if (!VIEWS[key]) return;
+  for (const section of document.querySelectorAll('.view')) section.classList.remove('on');
+  $('view-' + key).classList.add('on');
+  for (const button of document.querySelectorAll('#nav button')) {
+    if (button.dataset.view === key) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  }
+  $('viewTitle').textContent = VIEWS[key][0];
+  $('viewSub').textContent = VIEWS[key][1];
+  try { location.hash = key; } catch (e) { /* ignore */ }
+  if (key === 'history' && secret && !archiveLoaded) void loadArchive();
+}
+
+/* ---- wiring -------------------------------------------------------------- */
+$('nav').addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-view]');
+  if (button) showView(button.dataset.view);
+});
+document.addEventListener('click', (event) => {
+  const link = event.target.closest('[data-goto]');
+  if (link) showView(link.dataset.goto);
+});
+$('loginForm').addEventListener('submit', (event) => {
+  event.preventDefault();
+  secret = $('token').value.trim();
+  if (!secret) return;
+  try { sessionStorage.setItem('squad-token', secret); } catch (e) { /* private mode */ }
+  $('gateError').classList.add('hide');
+  failures = 0; interval = BASE_INTERVAL;
+  tick();
+});
+$('logout').addEventListener('click', () => logout(''));
+$('retry').addEventListener('click', () => { failures = 0; interval = BASE_INTERVAL; tick(); });
+$('refreshNow').addEventListener('click', () => { failures = 0; interval = BASE_INTERVAL; tick(); });
+$('nextRound').addEventListener('click', async () => {
+  if (!confirm('Neue gemeinsame Runde starten? Die vorläufigen Zähler werden zurückgesetzt.')) return;
+  const button = $('nextRound');
+  button.disabled = true;
+  try { await api('/api/round/next', 'POST', {}); await tick(); }
+  catch (error) { showError('Neue Runde fehlgeschlagen: ' + error.message); }
+  finally { button.disabled = false; }
+});
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && secret) { failures = 0; interval = BASE_INTERVAL; tick(); }
+});
+
+const initial = (location.hash || '').replace('#', '');
+if (VIEWS[initial]) showView(initial);
+if (secret) { showApp(); tick(); } else { schedule(BASE_INTERVAL); }
+</script>
+</body></html>

@@ -12,6 +12,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'SquadLoot-Windows-Client'))
 from vision import SearchInteraction, WindowsInput
 
+VERSION=(ROOT/'SquadLoot-Windows-Client'/'VERSION').read_text(encoding='ascii').strip()
 spec=importlib.util.spec_from_file_location('squadloot_release',ROOT/'scripts'/'build_release.py')
 release=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
@@ -60,17 +61,17 @@ class DistributionTests(unittest.TestCase):
     def test_packs_both_client_and_server_updates(self):
         with tempfile.TemporaryDirectory() as td:
             out=Path(td)
-            pi=release.build('1.3.1','LevinGamer8/SquadLoot',out)
+            pi=release.build(VERSION,'LevinGamer8/SquadLoot',out)
             manifest=json.loads((out/'latest.json').read_text())
-            self.assertEqual(manifest['client_version'],'1.3.1')
+            self.assertEqual(manifest['client_version'],VERSION)
             self.assertEqual(manifest['package_sha256'],hashlib.sha256(pi.read_bytes()).hexdigest())
-            client=out/'SquadLoot-Windows-1.3.1-update.zip'
+            client=out/f'SquadLoot-Windows-{VERSION}-update.zip'
             self.assertEqual(manifest['client_package_sha256'],hashlib.sha256(client.read_bytes()).hexdigest())
             with zipfile.ZipFile(client) as z:
                 self.assertIn('vision.py',z.namelist())
                 self.assertIn('app.py',z.namelist())
-                self.assertEqual(z.read('VERSION').decode().strip(),'1.3.1')
-            full=out/'SquadLoot-Windows-Client-v1.3.1.zip'
+                self.assertEqual(z.read('VERSION').decode().strip(),VERSION)
+            full=out/f'SquadLoot-Windows-Client-v{VERSION}.zip'
             with zipfile.ZipFile(full) as z:
                 self.assertIn('SquadLoot-Windows-Client/STARTEN.cmd',z.namelist())
                 self.assertNotIn('SquadLoot-Windows-Client/config.json',z.namelist())

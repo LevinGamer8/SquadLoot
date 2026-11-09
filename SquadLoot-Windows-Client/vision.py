@@ -98,6 +98,10 @@ class VisionDetector:
         self.count = 0
         self.state = 'Aus'
         self.perf_ms = 0.0
+        self.frames = 0
+        # Surfaced by the UI so the user can judge how reliable the estimate is.
+        self.last_event_at = None
+        self.last_event_text = ''
 
     def start(self):
         if not self.template_path.is_file():
@@ -118,6 +122,7 @@ class VisionDetector:
     def stop_now(self):
         self.stop.set()
         self.state = 'Aus'
+        self.last_score = 0.0
 
     def run(self):
         import cv2
@@ -153,9 +158,14 @@ class VisionDetector:
                 self.last_score = score
                 pressed = input_state.key_pressed(self.key)
                 self.state = f'Live-Beta · {self.key} · Treffer {score:.2f}'
-                if engine.update(score, pressed, time.monotonic()):
+                now = time.monotonic()
+                self.frames += 1
+                if engine.update(score, pressed, now):
                     self.core.adjust('vision', +1)
                     self.count += 1
+                    self.last_event_at = now
+                    self.last_event_text = (f'Suchhinweis + Taste {self.key} '
+                                            f'(Treffer {score:.2f})')
                 self.perf_ms = (time.perf_counter() - started) * 1000
         except Exception as exc:
             self.error = str(exc)[:180]

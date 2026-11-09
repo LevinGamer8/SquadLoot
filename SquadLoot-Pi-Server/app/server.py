@@ -258,11 +258,17 @@ def get_state():
                 member={'name':l['name'],'live_chests':provisional,'manual':l['manual'],'vision':l['vision'],
                         'ammo':l['ammo'],'food':l['food'],'destroyed':l['destroyed'],
                         'verified_chests':a['chests'] if a else None,'verified_treasures':a['treasure_count'] if a else None,
+                        'verified_ammo':a['ammo'] if a else None,'verified_food':a['food'] if a else None,
+                        'verified_destroyed':a['destroyed'] if a else None,
+                        'verified_reopened':a['reopened'] if a else None,
                         'online':now-l['last_seen']<=TIMEOUT_LIVE}
                 members.append(member)
             for a in verified_by_client.values():
                 members.append({'name':a['name'],'live_chests':0,'manual':0,'vision':0,'ammo':0,'food':0,'destroyed':0,
-                                'verified_chests':a['chests'],'verified_treasures':a['treasure_count'],'online':False})
+                                'verified_chests':a['chests'],'verified_treasures':a['treasure_count'],
+                                'verified_ammo':a['ammo'],'verified_food':a['food'],
+                                'verified_destroyed':a['destroyed'],'verified_reopened':a['reopened'],
+                                'online':False})
             total=sum((m['verified_chests'] if m['verified_chests'] is not None else m['live_chests']) for m in members)
             current={'id':rid,'created':active['created'],'members':members,'chests_total':total,
                      'confirmed_members':sum(m['verified_chests'] is not None for m in members),

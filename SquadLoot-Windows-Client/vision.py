@@ -906,11 +906,12 @@ class ManagedLiveEngine:
         with self._lock, self.core.lock:
             if self.round_id != self.core.round_id:
                 self.round_id = self.core.round_id
-                self.last_raw = approx
+                # Preserve the last raw total: the first event after the
+                # round boundary can already be the NEW round's first chest.
+                # Discarding that event would silently miss one chest.
                 self.count = self.certain = 0
                 self.core.vision = 0
                 self.core.last_live = 0.0
-                return False
             if approx < self.last_raw:
                 self.last_raw = approx  # external reset, never subtract counted chests
                 return False

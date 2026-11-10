@@ -57,7 +57,7 @@ class AutomaticOnlyInterfaceTests(unittest.TestCase):
                           'Erkennung starten', 'self.vision_meter',
                           "'chestcounter_exe', 'Pfad zur"):
             self.assertNotIn(forbidden, APP)
-        self.assertIn('replay_engine.scan_once(force=True)', APP)
+        self.assertIn('engine.scan_once(force=True)', APP)
         self.assertIn('self.core.replay_engine.start()', APP)
 
     def test_version_pair_stays_in_sync(self):

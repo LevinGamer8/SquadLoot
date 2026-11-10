@@ -53,11 +53,13 @@ class AutomaticOnlyInterfaceTests(unittest.TestCase):
 
     def test_single_button_ui_and_passive_replay_are_visible(self):
         for forbidden in ('PNG-Vorlage', 'OBS-Ordner wählen',
-                          'Deutsch kalibrieren', 'Deutsch zurücksetzen',
+                          'Deutsch zurücksetzen',
                           'Erkennung starten', 'self.vision_meter',
                           "'chestcounter_exe', 'Pfad zur"):
             self.assertNotIn(forbidden, APP)
         self.assertIn('self.core.replay_sync_all(force=True)', APP)
+        self.assertIn('def configure_german_live(self):', APP)
+        self.assertIn('def choose_live_rate(self, title):', APP)
         self.assertIn('self.core.replay_engine.start()', APP)
 
     def test_version_pair_stays_in_sync(self):

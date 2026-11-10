@@ -236,6 +236,23 @@ class DesktopSmokeTests(unittest.TestCase):
             self.pump()
         self.assertEqual(app.UNKNOWN_ICONS, set())
 
+    def test_09_live_language_quality_and_diagnostics_controls(self):
+        self.gui.show_page('live')
+        self.assertIn('Englisch (CHEST)', self.gui.live_language_values)
+        self.assertEqual(self.gui.live_rate_values['Ausgewogen · 15 fps'], 15)
+        self.assertIn('Munitionskiste', self.gui.missed_kind_values)
+        self.gui.choose_live_rate('Sparsam · 10 fps')
+        self.assertEqual(self.gui.core.config['live_process_fps'], 10)
+        self.gui.choose_live_language('Deutsch (TRUHE · Beta)')
+        self.assertEqual(self.gui.core.config['live_language'], 'de')
+        # Nothing gets recorded just by opening the live tab.
+        self.assertFalse(self.gui.live_engine.diagnostic_mode)
+        self.gui.toggle_live_diagnostics(False)
+        self.assertFalse(self.gui.core.config['live_diagnostics'])
+        self.gui.choose_live_rate('Ausgewogen · 15 fps')
+        self.gui.choose_live_language('Englisch (CHEST)')
+        self.assertEqual(app.UNKNOWN_ICONS, set())
+
     def test_08_live_monitor_selector_shows_thumbnail(self):
         from unittest.mock import patch
         from vision import _ppm_from_bgra

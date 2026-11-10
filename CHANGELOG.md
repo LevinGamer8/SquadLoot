@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased – Live-Performance und Diagnose (Freigabe gesperrt)
+
+- Optionale 10/15/20 fps im Live-Tab (Standard 15) und bessere Statusanzeige
+  für die tatsächliche Engine-Frequenz, Verarbeitungszeit und Dropped Frames.
+- Versionstreue, rücksetzbare Capture-Optimierung: FFmpeg `gdigrab`
+  liest nicht mehr unnötig 30 volle Bildschirmbilder bei 10/15 fps ein.
+- Schnellerer, durch Live-Ereignisse weckbarer Netzwerkabgleich.
+- Deutsche TRUHE-Popup-Kalibrierung direkt aus der SquadLoot-Oberfläche.
+- Opt-in lokale Diagnose-Clips für übersehene Truhen, zerstörte Truhen,
+  Munitions-, Obstkisten und sonstige Behälter (standardmäßig aus).
+- Keine falsche Vollständigkeitsangabe für Live-Loot-Kategorien:
+  Es fehlen echte beschriftete Testclips und ein validierter Mehrklassen-
+  Erkenner. **VERSION bleibt 1.5.5**, bis die Freigabekriterien erfüllt sind.
+  Siehe docs/LIVE-VALIDATION-1.5.6.md.
+
+
 ## 1.5.5 – Monitorvorschau und Replay-/Upload-Zuverlässigkeit
 
 - Automatische Monitorauswahl anhand des sichtbaren Fortnite-Fensters statt

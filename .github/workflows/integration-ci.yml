@@ -46,7 +46,7 @@ jobs:
           PY
 
   windows-managed-engines:
-    if: github.event_name == 'pull_request' && contains(github.head_ref, 'one-click-live-auto-replay')
+    if: github.event_name == 'pull_request' && (contains(github.head_ref, 'one-click-live-auto-replay') || contains(github.head_ref, 'live-performance'))
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -86,6 +86,23 @@ jobs:
                   timeout=45)
               assert test.returncode == 0, ('Live worker failed', test.stderr[-1000:])
               print('Visual headless runtime verified', test.stdout.strip())
+              # Verify the FPS capture patch against the actual pinned v0.2.3
+              # files, not just our mocked Python regression fixture.
+              source = (live / 'runtime/lib/fortnite_chest_counter'
+                        / 'input/video_sources.py')
+              before = source.read_text(encoding='utf-8')
+              assert '"-framerate", "30", "-offset_x"' in before
+              assert store.tune_visual_capture() is True
+              after = source.read_text(encoding='utf-8')
+              assert '"-framerate", str(fps), "-offset_x"' in after
+              compile(after, str(source), 'exec')
+              assert store.tune_visual_capture() is False
+              test = subprocess.run(
+                  [str(py), '-m', 'fortnite_chest_counter', '--version'],
+                  cwd=live, capture_output=True, text=True, errors='replace',
+                  timeout=45)
+              assert test.returncode == 0, ('Patched runtime failed', test.stderr[-1000:])
+              print('Visual runtime FPS capture patch verified')
           PY
       - name: Windows monitor detection and GDI preview smoke test
         shell: bash

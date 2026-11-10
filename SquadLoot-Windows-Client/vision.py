@@ -791,6 +791,38 @@ class ManagedComponentStore:
         install_german_visual_template(obs, matrix)
         return True
 
+    def tune_visual_capture(self):
+        """Reduce gdigrab's raw capture rate to the detector's FPS.
+
+        Pinned upstream v0.2.3 captures 30 full desktop frames each second
+        even when the detector analyses only 10/15. This verified, idempotent
+        source patch avoids the redundant high-resolution BitBlt copies.
+        A clean original is kept for rollback; unknown upstream versions
+        are never patched.
+        """
+        source = (self.visual_root() / 'runtime/lib/fortnite_chest_counter'
+                  / 'input/video_sources.py')
+        original = '"-framerate", "30", "-offset_x"'
+        patched = '"-framerate", str(fps), "-offset_x"'
+        content = source.read_text(encoding='utf-8')
+        if content.count(patched) == 1 and original not in content:
+            return False
+        if content.count(original) != 1 or patched in content:
+            raise RuntimeError('Unbekannte Visual-Engine-Version: '
+                               'Capture-Optimierung wurde nicht angewendet.')
+        updated = content.replace(original, patched, 1)
+        compile(updated, str(source), 'exec')
+        backup = source.with_name(source.name + '.squadloot-original')
+        if not backup.exists():
+            backup.write_text(content, encoding='utf-8')
+        staged = source.with_name(source.name + '.squadloot-staged')
+        try:
+            staged.write_text(updated, encoding='utf-8')
+            os.replace(staged, source)
+        finally:
+            staged.unlink(missing_ok=True)
+        return True
+
     def german_available(self):
         return (self.visual_root() / 'runtime/lib/fortnite_chest_counter/'
                 'templates/chest/de/truhe.npy').is_file()
@@ -1092,6 +1124,13 @@ class ManagedLiveEngine:
         self.monitor = 1
         self.last_source = ''
         self.warning = ''
+        self.fps = 0.0
+        self.frame_ms = 0.0
+        self.dropped = 0
+        self.chest_types = {}
+        self.last_candidate = ''
+        self.diagnostic_mode = False
+        self._stdin_lock = threading.Lock()
 
     @property
     def running(self):
@@ -1127,6 +1166,8 @@ class ManagedLiveEngine:
                 self.count += delta
                 self.core.vision = self.count
                 self.core.last_live = 0.0
+                if hasattr(self.core, 'live_wake'):
+                    self.core.live_wake.set()
                 self.last_event_at = time.monotonic()
             self.certain = max(self.certain, certain)
             return bool(delta)
@@ -1136,10 +1177,18 @@ class ManagedLiveEngine:
             return
         if os.name != 'nt':
             raise RuntimeError('Live-Bildanalyse benötigt Windows.')
+        lang = self.core.config.get('live_language', 'en')
+        if lang not in ('en', 'de'):
+            raise ValueError('Unbekannte Spielsprache im Live-Tracking.')
         self._stop.clear()
         self.state = 'Einrichtung'
         self.error = ''
         self.warning = ''
+        self.fps = self.frame_ms = 0.0
+        self.dropped = 0
+        self.chest_types = {}
+        self.last_candidate = ''
+        self.diagnostic_mode = bool(self.core.config.get('live_diagnostics', False))
         self.count = self.certain = self.last_raw = 0
         self.round_id = self.core.round_id
         with self.core.lock:
@@ -1158,24 +1207,35 @@ class ManagedLiveEngine:
                                             previous_obs=self.legacy_obs)
             if self._stop.is_set():
                 return
-            german = self.store.german_available()
-            if not german:
-                self.warning = ('Deutsch ohne TRUHE-Kalibrierung nur eingeschränkt '
-                                'erkennbar; Englisch bleibt verfügbar')
-            # EN is always supported by the pinned upstream templates. DE
-            # additionally needs an actual calibrated TRUHE image; without
-            # one only its language-independent object cue can contribute.
-            languages = '["en", "de"]' if german else '["en"]'
+            # Capture at the actual processing rate, not upstream's fixed
+            # 30 full-resolution desktop copies per second.
+            try:
+                self.store.tune_visual_capture()
+            except (OSError, RuntimeError, SyntaxError, AttributeError) as exc:
+                self.warning = ('Capture-Optimierung nicht aktiv: ' + str(exc)[:100])
+            lang = self.core.config.get('live_language', 'en')
+            if lang == 'de' and not self.store.german_available():
+                raise RuntimeError('Deutsch benötigt ein echtes TRUHE-Popup-Muster. '
+                                   'Unter Live-Tracking zuerst Deutsch kalibrieren.')
+            languages = '["de"]' if lang == 'de' else '["en"]'
+            try:
+                fps = int(self.core.config.get('live_process_fps', 15))
+            except (ValueError, TypeError):
+                fps = 15
+            if fps not in (10, 15, 20):
+                fps = 15
             config = root / 'squadloot-live.toml'
             config.write_text(
                 '[detector]\n'
                 'languages = ' + languages + '\n'
-                'process_fps = 15\n'
+                f'process_fps = {fps}\n'
                 'count_interaction_object_as_approx = true\n'
                 '[logging]\n'
                 'enabled = false\n'
                 '[capture]\n'
-                'mode = "off"\n', encoding='utf-8')
+                'mode = "' + ('marks' if self.diagnostic_mode else 'off') + '"\n'
+                '[live]\n'
+                'status_interval_seconds = 2\n', encoding='utf-8')
             python = self.store.visual_python()
             env = os.environ.copy()
             env['PATH'] = (str(root / 'runtime' / 'ffmpeg') + os.pathsep +
@@ -1196,7 +1256,7 @@ class ManagedLiveEngine:
                    '--gui', '--reset',
                    '--state', str(root / 'state' / 'squadloot-live.json'),
                    '--obs-dir', str(root / 'obs_output')]
-            self.state = f'Bildanalyse verbindet Monitor {monitor}'
+            self.state = f'Bildanalyse verbindet Monitor {monitor} · {fps} fps'
             error_log = root / 'squadloot-live-errors.log'
             connected = False
             # Save stderr instead of discarding the only actionable reason
@@ -1220,6 +1280,24 @@ class ManagedLiveEngine:
                     kind = event.get('type')
                     if kind in ('event', 'counts'):
                         self.feed_message(event)
+                        if kind == 'event' and event.get('verdict') == 'rejected':
+                            if event.get('generic'):
+                                self.last_candidate = 'Interaktion erkannt – Art noch unbestimmt'
+                    elif kind == 'types':
+                        breakdown = event.get('breakdown')
+                        if isinstance(breakdown, dict):
+                            self.chest_types = {
+                                str(name)[:35]: max(0, min(1000000, row.get('approx', 0)))
+                                for name, row in breakdown.items()
+                                if isinstance(name, str) and isinstance(row, dict)
+                                and type(row.get('approx')) is int}
+                    elif kind == 'status':
+                        if isinstance(event.get('fps'), (float, int)):
+                            self.fps = max(0, min(120, float(event['fps'])))
+                        if isinstance(event.get('ms_per_frame'), (float, int)):
+                            self.frame_ms = max(0, min(10000, float(event['ms_per_frame'])))
+                        if type(event.get('dropped')) is int:
+                            self.dropped = max(0, event['dropped'])
                     elif kind == 'error':
                         self.error = str(event.get('text', ''))[:200]
                         self.state = 'Live-Erkennungsfehler'
@@ -1228,7 +1306,7 @@ class ManagedLiveEngine:
                     elif kind == 'connected':
                         connected = True
                         self.last_source = str(event.get('source', ''))[:120]
-                        self.state = f'Live-Tracking aktiv · Monitor {monitor}'
+                        self.state = f'Live-Tracking aktiv · Monitor {monitor} · {fps} fps'
                 exit_code = self.process.wait(timeout=10)
             if not self._stop.is_set():
                 if exit_code or not connected:
@@ -1257,6 +1335,38 @@ class ManagedLiveEngine:
             self.started = False
             if self._stop.is_set():
                 self.state = 'Aus'
+
+    def _command(self, command):
+        """Send only known control commands to the local worker, never game input."""
+        if not self.running or self.process is None or self.process.poll() is not None:
+            return False
+        try:
+            with self._stdin_lock:
+                self.process.stdin.write((command + '\n').encode('utf-8'))
+                self.process.stdin.flush()
+            return True
+        except (OSError, ValueError, BrokenPipeError, AttributeError):
+            return False
+
+    def set_diagnostics(self, enabled):
+        """Recording is off by default and opt-in because it costs CPU/disk."""
+        enabled = bool(enabled)
+        if self._command('capture marks' if enabled else 'capture off'):
+            self.diagnostic_mode = enabled
+            return True
+        return False
+
+    def mark_missed(self, category):
+        """Keep a short local clip for a missed loot action (diagnostics only)."""
+        choices = {
+            'chest': 'chest missed', 'destroyed': 'chest destroyed',
+            'ammo': 'ammo box', 'food': 'food box',
+            'other': 'other container',
+        }
+        label = choices.get(category)
+        if not label or not self.diagnostic_mode:
+            return False
+        return self._command('mark ' + label)
 
     def reset_counts(self):
         """Reset SquadLoot's provisional totals, not the external process."""

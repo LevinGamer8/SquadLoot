@@ -387,3 +387,14 @@ Archiv/CSV und gespeicherte Matches bleiben unverändert. Der alte
 manuelle API-Wert wird weiterhin für bestehende Clients akzeptiert,
 während aktualisierte Windows-Clients keine Plus-/Minus-Zählung mehr
 anbieten. Die Visual-Counter-Integration bleibt nutzbar.
+
+
+## SquadLoot v1.5.3 – optionale deutsche XP-Erkennung
+
+SquadLoot-Clients können jetzt aus einem vom Benutzer selbst aufgenommenen
+deutschen XP-Popup-Screenshot eine eigene Truhenwort-Vorlage für den separat
+installierten externen Visual Chest Counter erstellen. Der Pi selbst bleibt
+unverändert: SQLite, Cloudflare, Archiv, CSV, API und veröffentlichte
+Clientupdate-Endpunkte sind rückwärtskompatibel. Bilder bleiben auf dem Client;
+nur vorläufige Zähleränderungen erreichen den Pi. Die deutsche Erkennung ist
+noch nicht durch Live-Matches validiert.

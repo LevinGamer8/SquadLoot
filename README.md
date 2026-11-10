@@ -4,6 +4,25 @@ SquadLoot hostet eure Fortnite-Truhenstatistiken lokal auf dem Raspberry Pi.
 Der Code ist als öffentliche Release-Quelle gedacht; **keine echten Zugangsdaten
 werden in Git gespeichert**.
 
+## SquadLoot v1.5.3: Deutsches Truhen-XP-Popup kalibrieren
+
+Der separat installierte Visual Chest Counter v0.2.3 unterstützt ab Werk nur
+Englisch und Portugiesisch. SquadLoot kann jetzt auf Wunsch aus **einem echten
+Screenshot eines deutschen Truhen-XP-Popups** eine lokale Truhenwort-Vorlage
+erstellen und die Sprachauswahl des externen Programms um
+**Deutsch (SquadLoot Beta)** erweitern.
+
+Dazu unter **Live-Tracking → Deutsch kalibrieren** den Screenshot auswählen,
+nur das lila XP-**Truhenwort** markieren und den externen Counter anschließend
+mit Deutsch neu starten. Der externe Counter muss während der Änderung
+geschlossen sein. Die Originaldateien werden gesichert und können über
+**Deutsch zurücksetzen** wiederhergestellt werden.
+
+Ohne echten deutschen Screenshot ist keine verifizierte Bildvorlage möglich.
+Die Erkennung muss anhand echter deutscher Matches getestet und mit
+Replay-Ergebnissen verglichen werden. Der englische Modus bleibt unverändert.
+[Schritt-für-Schritt-Anleitung](docs/VISUAL-LIVE-TEST.md).
+
 ## SquadLoot v1.5.2: automatische Erkennung ohne manuelle Zählbuttons
 
 Im Windows-Dashboard und in Live-Tracking gibt es keine Kiste+/Kiste−-,

@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.5.3 – Deutsches Truhen-XP-Popup kalibrieren (Beta)
+
+- Einmalige, vollständig lokale Erstellung eines echten deutschen
+  TRUHE-Wortmusters aus einem Gameplay-Screenshot; wahlweise Deutsch
+  im separat installierten Visual Chest Counter v0.2.3 aktivieren.
+- Keine neue OCR-/KI- oder Video-Abhängigkeit im SquadLoot-Client.
+  Normalisierung auf 1280×720 mit dem FFmpeg der externen Anwendung,
+  anschließende Maskenselektion und NumPy-kompatibles NPY-Vorlagenformat.
+- Explizit bestätigte Anpassung der externen MIT-App mit Originaldatei-Backup,
+  idempotenter Aktualisierung und Wiederherstellungsoption.
+- Kein automatischer Eingriff beim normalen Windows-Start; die bestehende
+  visuelle Live-Synchronisierung, das HUD und die Replay-Historie bleiben gleich.
+- Vorhandene englische/portugiesische Erkennung bleibt verwendbar.
+- Keine Genauigkeitsbehauptung: echtes deutsches Truhenbild und Testmatch nötig;
+  englischspezifische Zusatzmechanismen sind in Deutsch noch nicht angepasst.
+- Automatisierte NPY-, Masken-, Quellpatch-, Rollback- und GUI-Regressionstests.
+
+
 ## 1.5.2 – Automatische Erkennung statt manueller Plus/Minus-Zähler
 
 - Entfernt die manuellen Truhe+/Truhe−, Munitions-, Obstkisten- und Zerstört-

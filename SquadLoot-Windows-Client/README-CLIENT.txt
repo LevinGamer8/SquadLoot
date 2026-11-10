@@ -138,3 +138,20 @@ bestaetigt. Neue Runde, Replay-Auswertung und Zuruecksetzen der
 vorlaeufigen Live-Schaetzung sind weiterhin moeglich.
 Historische Daten und alte API-Felder bleiben fuer aeltere Clients
 kompatibel. Das Update erfolgt weiterhin ueber den Raspberry Pi.
+
+
+SQUADLOOT 1.5.3 - DEUTSCHE XP-POPUP-KALIBRIERUNG (BETA)
+======================================================
+
+Fortnite darf wieder auf Deutsch gestellt werden. Der externe Visual
+Chest Counter v0.2.3 muss fuer deutsche Truhen aber erst eine echte
+XP-Wortvorlage bekommen. Unter Live-Tracking -> Deutsch kalibrieren
+einen Screenshot von einer deutschen Truhen-XP-Einblendung auswaehlen,
+nur das violette Truhen-WORT markieren und Muster installieren.
+Der externe Counter muss beendet sein. Anschliessend neu starten und
+Settings -> Game language -> Deutsch (SquadLoot Beta) waehlen.
+Die alte englische Erkennung bleibt unveraendert. Der Patch sichert
+die Originaldateien des externen Programms und ist rueckgaengig machbar.
+Nach Updates des externen Counters muss die Kompatibilitaet neu geprueft
+werden. Der deutsche Modus ist noch nicht mit echten Matches validiert.
+Mehr in docs/VISUAL-LIVE-TEST.md auf GitHub.

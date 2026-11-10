@@ -831,7 +831,11 @@ class ManagedComponentStore:
         module = package / 'squadloot_loot_popup.py'
         original = counter.read_text(encoding='utf-8')
         marker = '# SquadLootLootPopupsV1'
-        before_loop = '    try:\n        for t, frame in source.frames():\n'
+        # Two v0.2.3 functions loop over source.frames(); only the LIVE loop
+        # follows the signal-handler guard. Patch that unique location.
+        before_loop = ('    if guard is not None:\n'
+                       '        guard.on_request = source.request_stop\n'
+                       '    try:\n        for t, frame in source.frames():\n')
         after_process = '            applied = session.apply(est.process_frame(t, frame), t)\n'
         patch_init = (
             '    ' + marker + '\n'

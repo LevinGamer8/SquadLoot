@@ -29,6 +29,8 @@ class LootPopupPatchTests(unittest.TestCase):
             counter = pkg / 'counter.py'
             original = (
                 'def run(source, session, est, cfg):\n'
+                '    if guard is not None:\n'
+                '        guard.on_request = source.request_stop\n'
                 '    try:\n'
                 '        for t, frame in source.frames():\n'
                 '            applied = session.apply(est.process_frame(t, frame), t)\n'

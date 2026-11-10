@@ -3186,7 +3186,9 @@ class Gui:
 
     # ---- screenshot-based German calibration; local-only -------------
     def configure_german_live(self):
-        if self.live_engine.running:
+        if (self.live_engine.running or
+                (self.live_engine.thread is not None and
+                 self.live_engine.thread.is_alive())):
             messagebox.showwarning(
                 'Deutsch kalibrieren',
                 'Bitte zuerst den Live-Test stoppen. Die Erkennungsdateien '

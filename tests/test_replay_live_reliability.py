@@ -191,10 +191,18 @@ class TestCapturePerformance(unittest.TestCase):
             source.parent.mkdir(parents=True, exist_ok=True)
             original = 'args = ["-framerate", "30", "-offset_x", str(x)]\n'
             source.write_text(original, encoding='utf-8')
+            cache = source.parent / '__pycache__'
+            cache.mkdir()
+            stale = cache / 'video_sources.cpython-313.pyc'
+            stale.write_bytes(b'official unchecked-hash bytecode')
             self.assertTrue(store.tune_visual_capture())
+            self.assertFalse(stale.exists(), 'the source patch must invalidate unchecked bytecode')
             updated = source.read_text(encoding='utf-8')
             self.assertIn('"-framerate", str(fps)', updated)
+            # Also purge any old cache if the patched source was already there.
+            stale.write_bytes(b'old cache')
             self.assertFalse(store.tune_visual_capture())
+            self.assertFalse(stale.exists())
             self.assertEqual(source.with_name(
                 'video_sources.py.squadloot-original').read_text(encoding='utf-8'), original)
             compile(updated, str(source), 'exec')

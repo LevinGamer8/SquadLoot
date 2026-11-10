@@ -457,6 +457,27 @@ def german_numpy_template(rows):
     return prefix + _struct.pack('<H', len(header_bytes)) + header_bytes + raw
 
 
+def _invalidate_unchecked_bytecode(source):
+    """Remove packaged UNCHECKED_HASH .pyc files after editing an engine module.
+
+    The pinned external v0.2.3 ZIP ships hash-based bytecode with
+    PycInvalidationMode.UNCHECKED_HASH. Without deleting it, Python ignores
+    modifications to the .py source and keeps running the original program!
+    Only purge the matching cache for the exact modified module.
+    """
+    source = Path(source)
+    cache_dir = source.parent / '__pycache__'
+    if not cache_dir.is_dir():
+        return 0
+    deleted = 0
+    for candidate in cache_dir.glob(source.stem + '.*.pyc'):
+        if not candidate.is_file() or candidate.is_symlink():
+            continue
+        candidate.unlink()
+        deleted += 1
+    return deleted
+
+
 def _german_atomic_write(path, data):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -523,6 +544,8 @@ def install_german_visual_template(obs_output, matrix):
         if fresh:
             _german_atomic_write(visual, new_visual.encode('utf-8'))
             _german_atomic_write(settings, new_settings.encode('utf-8'))
+        _invalidate_unchecked_bytecode(visual)
+        _invalidate_unchecked_bytecode(settings)
     except OSError:
         if fresh:
             _german_atomic_write(visual, visual_text.encode('utf-8'))
@@ -551,6 +574,8 @@ def restore_german_visual_template(obs_output):
                          'Alte Python-Dateien dürfen nicht zurückkopiert werden.')
     _german_atomic_write(visual, bvisual.read_bytes())
     _german_atomic_write(settings, bsettings.read_bytes())
+    _invalidate_unchecked_bytecode(visual)
+    _invalidate_unchecked_bytecode(settings)
     template.unlink(missing_ok=True)
     _shutil.rmtree(backup_dir)
     return str(root)
@@ -806,6 +831,9 @@ class ManagedComponentStore:
         patched = '"-framerate", str(fps), "-offset_x"'
         content = source.read_text(encoding='utf-8')
         if content.count(patched) == 1 and original not in content:
+            # Important: the official runtime has UNCHECKED_HASH .pyc, so
+            # removing stale bytecode is required even on later launches.
+            _invalidate_unchecked_bytecode(source)
             return False
         if content.count(original) != 1 or patched in content:
             raise RuntimeError('Unbekannte Visual-Engine-Version: '
@@ -819,6 +847,7 @@ class ManagedComponentStore:
         try:
             staged.write_text(updated, encoding='utf-8')
             os.replace(staged, source)
+            _invalidate_unchecked_bytecode(source)
         finally:
             staged.unlink(missing_ok=True)
         return True
@@ -826,6 +855,26 @@ class ManagedComponentStore:
     def german_available(self):
         return (self.visual_root() / 'runtime/lib/fortnite_chest_counter/'
                 'templates/chest/de/truhe.npy').is_file()
+
+    def activate_german_template(self):
+        """Ensure the actual worker imports the already patched DE source.
+
+        The presence of a TRUHE .npy file alone is NOT sufficient; both
+        source modules must contain our known patch, and their unchecked
+        bytecode must be invalidated before starting the worker.
+        """
+        if not self.german_available():
+            return False
+        module = (self.visual_root() / 'runtime/lib/fortnite_chest_counter')
+        visual = module / 'detection/visual.py'
+        settings = module / 'settings.py'
+        if not (_GERMAN_MARKER in visual.read_text(encoding='utf-8') and
+                _GERMAN_MARKER in settings.read_text(encoding='utf-8')):
+            raise RuntimeError('TRUHE-Vorlage vorhanden, aber Deutsch-Modul '
+                               'nicht vollständig aktiviert. Bitte erneut kalibrieren.')
+        _invalidate_unchecked_bytecode(visual)
+        _invalidate_unchecked_bytecode(settings)
+        return True
 
 
 class ManagedReplayEngine:
@@ -1217,6 +1266,8 @@ class ManagedLiveEngine:
             if lang == 'de' and not self.store.german_available():
                 raise RuntimeError('Deutsch benötigt ein echtes TRUHE-Popup-Muster. '
                                    'Unter Live-Tracking zuerst Deutsch kalibrieren.')
+            if lang == 'de':
+                self.store.activate_german_template()
             languages = '["de"]' if lang == 'de' else '["en"]'
             try:
                 fps = int(self.core.config.get('live_process_fps', 15))

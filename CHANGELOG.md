@@ -6,6 +6,10 @@
   für die tatsächliche Engine-Frequenz, Verarbeitungszeit und Dropped Frames.
 - Versionstreue, rücksetzbare Capture-Optimierung: FFmpeg `gdigrab`
   liest nicht mehr unnötig 30 volle Bildschirmbilder bei 10/15 fps ein.
+- Wichtiger Cache-Fix: Der gepinnte VisualCounter bringt vorkompilierte
+  `UNCHECKED_HASH`-Pythonmodule mit. Nach Änderungen an Capture-Quellcode
+  und deutschen Vorlagen werden passende `.pyc` gezielt entfernt, sonst
+  bliebe beim Start der alte Code trotz gepatchter Datei aktiv.
 - Schnellerer, durch Live-Ereignisse weckbarer Netzwerkabgleich.
 - Deutsche TRUHE-Popup-Kalibrierung direkt aus der SquadLoot-Oberfläche.
 - Opt-in lokale Diagnose-Clips für übersehene Truhen, zerstörte Truhen,

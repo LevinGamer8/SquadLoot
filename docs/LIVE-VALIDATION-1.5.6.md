@@ -25,6 +25,11 @@
   Sekunde zu erstellen, nimmt die Engine jetzt 10, 15 oder 20 auf.
 - Die originale Source-Datei der SHA256-geprüften Engine wird für ein
   sicheres Rollback aufbewahrt. Unbekannte Engines werden nicht modifiziert.
+- **Wichtiges Fix:** Die externe App legt `UNCHECKED_HASH`-Python-`.pyc`
+  an. Ohne gezielte Invalidierung bleibt selbst nach dem Code-Patch die
+  *alte* 30-fps-Version aktiv. Dasselbe Problem betrifft das frühere
+  deutsche XP-Popup-Muster. Betroffene Modul-Caches werden vor dem Start
+  neu generieren gelassen, keine anderen Module/Spieldateien verändert.
 - Die Live-UI bietet 10/15/20 fps; 15 fps bleibt Standard.
   10 fps kann die Erkennungsrate senken; 20 fps kann wieder mehr Leistung
   benötigen. Keine automatische Aussage über tatsächliche Spiel-FPS.

@@ -97,6 +97,18 @@ jobs:
               assert '"-framerate", str(fps), "-offset_x"' in after
               compile(after, str(source), 'exec')
               assert store.tune_visual_capture() is False
+              test_args = subprocess.run(
+                  [str(py), '-c',
+                   'from fortnite_chest_counter.input.video_sources import make_source; '
+                   's=make_source("desktop",10,monitor=1); '
+                   'a=s.input_args; '
+                   'assert a[a.index("-framerate")+1]=="10", a; '
+                   'print("gdigrab captures at 10 fps")'],
+                  cwd=live, capture_output=True, text=True, errors='replace',
+                  timeout=45)
+              assert test_args.returncode == 0, ('Patched gdigrab args failed',
+                                                 test_args.stdout, test_args.stderr[-1000:])
+              print(test_args.stdout.strip())
               test = subprocess.run(
                   [str(py), '-m', 'fortnite_chest_counter', '--version'],
                   cwd=live, capture_output=True, text=True, errors='replace',
@@ -109,6 +121,7 @@ jobs:
         run: |
           python - <<'PY'
           import os
+          import json
           import pathlib
           import subprocess
           import sys
@@ -144,8 +157,14 @@ jobs:
                       proc.kill()
               assert proc.returncode == 0, ('Worker exit', proc.returncode, err[-1500:])
               assert b'"type": "connected"' in out, ('Capture never connected', out[-1500:], err[-1500:])
-              assert b'"type": "status"' in out, ('No processed frames', out[-1500:], err[-1500:])
-              print('Patched live detector connected, processed frames, and stopped cleanly')
+              events = [json.loads(line) for line in out.splitlines()
+                        if line.strip().startswith(b'{')]
+              stopped = next((row for row in events if row.get('type') == 'stopped'), None)
+              assert stopped is not None, ('No stop summary', out[-1500:], err[-1500:])
+              assert stopped.get('frames_processed', 0) >= 5, ('No processed frames', stopped)
+              print('Patched live detector:', stopped['frames_processed'],
+                    'frames processed, FPS', stopped.get('detector_fps'),
+                    'dropped', stopped.get('frames_dropped'))
           PY
       - name: Windows monitor detection and GDI preview smoke test
         shell: bash

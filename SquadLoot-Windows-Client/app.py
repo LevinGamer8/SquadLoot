@@ -14,7 +14,6 @@ reads a thread-safe snapshot from client_core.Core.
 from __future__ import annotations
 
 import argparse
-import base64
 import ctypes
 import json
 import math
@@ -3020,7 +3019,7 @@ class Gui:
             return
         try:
             self.monitor_preview_image = tk.PhotoImage(
-                data=base64.b64encode(ppm).decode('ascii'), format='PPM')
+                data=ppm, format='PPM')
             canvas = self.live_monitor_canvas
             canvas.delete('all')
             canvas.create_image(

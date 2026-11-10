@@ -426,6 +426,46 @@ class HudWindowTests(unittest.TestCase):
         self.hud.hide()                 # idempotent
         self.hud.update(demo_data())    # must not raise once hidden
 
+    def test_15b_preview_remaps_an_existing_withdrawn_hud(self):
+        """A HUD may have a Tk window object yet still be invisible."""
+        self.hud.show()
+        self.pump()
+        self.assertTrue(self.hud.win.winfo_viewable())
+        self.hud.win.withdraw()
+        self.pump()
+        self.assertFalse(self.hud.win.winfo_viewable())
+        self.hud.show()  # used to return early without bringing window back
+        self.pump()
+        self.assertTrue(self.hud.win.winfo_viewable())
+
+    def test_15c_default_position_uses_primary_not_virtual_left_edge(self):
+        from unittest.mock import patch
+        with patch.object(app.Win32, 'primary_screen',
+                          return_value=(0, 0, 1920, 1080)):
+            with patch.object(self.hud, 'screen_box',
+                              return_value=(-1920, 0, 3840, 1080)):
+                x, y = self.hud.default_position(188, 60)
+        self.assertGreaterEqual(x, 0)
+        self.assertLess(x, 1920 - 188)
+        self.assertGreaterEqual(y, 0)
+
+    def test_15d_hud_has_opaque_background_instead_of_invisible_color_key(self):
+        self.hud.show()
+        self.pump()
+        self.assertEqual(self.hud.win.cget('bg'), app.T.SURFACE)
+        self.assertTrue(self.hud.win.winfo_viewable())
+
+    def test_15e_reset_position_does_not_restore_stale_coordinates(self):
+        self.hud.show()
+        self.pump()
+        self.hud.win.geometry('+320+240')
+        self.pump()
+        self.hud.reset_position()
+        self.pump()
+        self.assertIsNone(self.core.config['hud_x'])
+        self.assertIsNone(self.core.config['hud_y'])
+        self.assertTrue(self.hud.win.winfo_viewable())
+
     def test_17_opacity_setting_is_applied_and_clamped(self):
         self.hud.show()
         self.core.config['hud_opacity'] = 5.0

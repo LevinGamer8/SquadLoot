@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.5.1 – HUD-Anzeige auf Windows stabilisiert
+
+* Windows-HUD wird nach dem Erstellen erst sichtbar eingeblendet und danach
+  mit Win32-Fensterstilen versehen; Vorschau kann ein verdecktes Fenster
+  wieder nach vorne holen.
+* Robuste 64-Bit-HWND-Zugriffe auf Windows, insbesondere GetParent und
+  SetWindowPos.
+* Startposition wird auf dem Hauptmonitor statt am linken Rand des gesamten
+  virtuellen Desktops berechnet. Zuruecksetzen speichert keine veraltete Position.
+* Voruebergehend keine potenziell problematische Tk-Farbschluesseltransparenz
+  fuer abgerundete Ecken. Die kompakte Karte bleibt halbtransparent und
+  klickdurchlaessig, aber der aeussere Hintergrund ist rechteckig.
+* Neue Schaltflaeche **HUD pruefen** in den Einstellungen, um Fensterstatus,
+  Position, Groesse, Deckkraft und Monitor-Koordinaten ohne Zugangsdaten
+  anzuzeigen.
+* Vier weitere Regressionstests fuer Remapping, Startposition,
+  Hintergrund und Positionsreset.
+
+**Windows-Sichtbarkeit muss noch auf einem echten Windows-PC verifiziert werden.**
+Es gibt keine Fortnitespeicher-Zugriffe oder Anti-Cheat-Manipulation.
+
+
 ## 1.5.0 — Kompaktes HUD und optionaler visueller Live-Test
 
 Das alte Overlay war ein kleines Anwendungsfenster (330 × 220 px) mit

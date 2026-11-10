@@ -97,6 +97,32 @@ jobs:
               assert '"-framerate", str(fps), "-offset_x"' in after
               compile(after, str(source), 'exec')
               assert store.tune_visual_capture() is False
+              # Test the REAL pinned upstream counter.py, not only the mock fixture.
+              assert store.install_loot_popup() is True
+              assert store.install_loot_popup() is False
+              source_counter = (live / 'runtime/lib/fortnite_chest_counter/counter.py')
+              assert '# SquadLootLootPopupsV1' in source_counter.read_text(encoding='utf-8')
+              assert source_counter.with_name('counter.py.squadloot-original').is_file()
+              model_smoke = (
+                  'import base64,zlib,numpy as np; '
+                  'from fortnite_chest_counter.squadloot_loot_popup import '
+                  'LootPopupDetector,_WORDS; '
+                  'shape,payload=_WORDS["ammo"]; '
+                  'glyph=np.frombuffer(zlib.decompress(base64.b64decode(payload)),dtype=np.uint8).reshape(shape); '
+                  'frame=np.zeros((720,1280,3),dtype=np.uint8); '
+                  'frame[230:241,869:931]=glyph[:,:,None]*np.array([232,186,242],dtype=np.uint8); '
+                  'det=LootPopupDetector(); '
+                  'assert det.update(0,frame)==[]; '
+                  'events=det.update(.1,frame); '
+                  'assert len(events)==1 and events[0][0]=="ammo",events; '
+                  'print("embedded ammo popup classifier detects 2-frame event",events)'
+              )
+              model_check = subprocess.run(
+                  [str(py), '-c', model_smoke], cwd=live,
+                  capture_output=True, text=True, errors='replace', timeout=40)
+              assert model_check.returncode == 0, ('Embedded popup classifier failed',
+                                                     model_check.stdout,model_check.stderr[-1000:])
+              print(model_check.stdout.strip())
               test_args = subprocess.run(
                   [str(py), '-c',
                    'from fortnite_chest_counter.input.video_sources import make_source; '
@@ -134,6 +160,7 @@ jobs:
               store = ManagedComponentStore(root=root)
               live = store.ensure_visual()
               store.tune_visual_capture()
+              store.install_loot_popup()
               cfg = root / 'live.toml'
               cfg.write_text('[detector]\nlanguages = ["en"]\nprocess_fps = 10\n[logging]\nenabled = false\n[capture]\nmode = "off"\n',
                              encoding='utf-8')

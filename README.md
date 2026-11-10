@@ -171,8 +171,9 @@ verwende keine untrusted Pull-Requests als Release-Quelle.
 
 Die Freunde brauchen **keine GitHub-Zugangsdaten**. Sie laden den
 [Windows-Client aus dem neuesten Release](https://github.com/LevinGamer8/SquadLoot/releases/latest)
-oder einmal `SquadLoot-Freunde-Setup-vX.Y.Z.zip` und führen das enthaltene `SQUADLOOT_INSTALLIEREN.cmd` aus. Python 3.11+, ChestCounter und eingeschaltete
-Fortnite-Replays sind erforderlich.
+oder einmal `SquadLoot-Freunde-Setup-vX.Y.Z.zip` und führen das enthaltene `SQUADLOOT_INSTALLIEREN.cmd` aus. Python 3.11+ (mit Tkinter) und eingeschaltete Fortnite-Replays
+sind erforderlich. **ChestCounter.exe muss niemand mehr separat installieren
+oder konfigurieren:** SquadLoot verwaltet die geprüfte Replay-Laufzeit selbst.
 
 Zum Einrichten benötigt jeder Spieler:
 - `https://squadloot.megacraft.de` als Serveradresse
@@ -180,11 +181,12 @@ Zum Einrichten benötigt jeder Spieler:
 - eine eigene **Cloudflare Access Service Client-ID und Secret** (privat)
 - den eigenen Fortnite-Spielernamen
 
-Live-Erkennung: Nur als **experimentelle Schätzung** durch optische
-Erkennung + lokal abgefragte Interaktionstaste. Keine Speicherzugriffe,
-keine Fortnite-Paketmanipulation oder Entschlüsselung von Live-Replays.
-Bildschirmmodus standardmäßig ausgeschaltet, wenige ROI-Screenshots/Sekunde.
-Für reale Daten muss jedes Match mit ChestCounter nachträglich ausgewertet werden.
+Live-Erkennung: Optionaler, integrierter visueller Worker (XP-Popups und
+Objekthinweise, nur Schätzung). Monitorquelle und lokale Bildschirmvorschau
+liegen im Live-Tab. Es gibt keine separate ChestCounter-Installation,
+keine Interaktionstaste und keinen Zugriff auf Fortnite-Prozessspeicher,
+Netzwerkpakete oder unvollständige Replay-Schlüssel. Das Replay wird nach
+Matchende automatisch ausgewertet und bestätigt die Schätzwerte.
 
 ### Updates
 

@@ -122,7 +122,8 @@ class CalibrationTests(unittest.TestCase):
         update = (CLIENT / 'update_manager.py').read_text(encoding='utf-8')
         # 1.5.4 uses the already calibrated private template automatically;
         # the user sees no extra external-counter setup UI.
-        self.assertNotIn('Deutsch kalibrieren', app)
+        # The new German calibration lives inside SquadLoot, not an external setup.
+        self.assertIn('def configure_german_live(self):', app)
         self.assertNotIn('OBS-Ordner wählen', app)
         self.assertIn('def toggle_integrated_live(self):', app)
         self.assertIn('self.live_engine = ManagedLiveEngine(self.core)', app)

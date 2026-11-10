@@ -185,12 +185,13 @@ class ReleaseCompatibilityTests(unittest.TestCase):
     def test_one_click_ui_has_no_old_manual_setups(self):
         source=(CLIENT/'app.py').read_text(encoding='utf-8')
         for forbidden in ('PNG-Vorlage', 'OBS-Ordner wählen',
-                          'Deutsch kalibrieren', 'Erkennung starten',
+                          'Erkennung starten',
                           'Pfad zur ChestCounter.exe'):
             self.assertNotIn(forbidden,source)
         self.assertIn('self.live_engine = ManagedLiveEngine(self.core)',source)
         self.assertIn('self.core.replay_engine.start()',source)
         self.assertIn('Live-Test starten',source)
+        self.assertIn('def configure_german_live(self):',source)
 
 
 if __name__ == '__main__':

@@ -125,3 +125,16 @@ Fensterdiagnose-Dialog mit sichtbarem Status und Koordinaten (ohne Tokens).
 Auf einigen Systemen bleiben die Ecken voruebergehend rechteckig, damit
 das kleine HUD nicht durch transparente Fensterschichten verschwindet.
 Wenn es im Spiel nicht sichtbar ist, Windowed Fullscreen testen.
+
+
+SQUADLOOT 1.5.2 - NUR AUTOMATISCHE KISTENZAEHLUNG
+=================================================
+
+Manuelle Kiste+/Kiste-, Zerstört+, Munition+ und Obstbox+ wurden aus
+Dashboard und Live-Tracking entfernt. Der optionale Visual Chest Counter
+(v1.5.0) und das kleine HUD (v1.5.1) bleiben erhalten. Die Live-Zaehler
+zeigen automatisch erkannte Werte und werden nach dem Match vom Replay
+bestaetigt. Neue Runde, Replay-Auswertung und Zuruecksetzen der
+vorlaeufigen Live-Schaetzung sind weiterhin moeglich.
+Historische Daten und alte API-Felder bleiben fuer aeltere Clients
+kompatibel. Das Update erfolgt weiterhin ueber den Raspberry Pi.

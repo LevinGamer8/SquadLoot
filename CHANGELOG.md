@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.5.2 – Automatische Erkennung statt manueller Plus/Minus-Zähler
+
+- Entfernt die manuellen Truhe+/Truhe−, Munitions-, Obstkisten- und Zerstört-
+  Schnellbuttons aus Dashboard und Live-Tracking.
+- Der Live-Bereich zeigt nun automatische Erkennung, Squad-Zähler und
+  Replay-bestätigte Werte im Mittelpunkt; die Verbindung zu Visual Chest
+  Counter v0.2.x bleibt unverändert.
+- „Neue Squad-Runde“, „Replay auswerten“ und „Live-Schätzung zurücksetzen“
+  bleiben vorhanden. Keine manuellen Buchungen mehr in der Oberfläche.
+- Das Web-Dashboard weist auf automatische Schätzungen und spätere
+  Replay-Bestätigung statt manuelle Klicks hin.
+- Historische SQLite-Daten und API-Felder bleiben unverändert, sodass
+  ältere Clients nicht plötzlich Fehler erhalten. Keine Datenmigration.
+- Windows- und Pi-Version über den bestehenden GitHub/Pi Auto-Updater.
+- Regressionstest verhindert, dass manuelle Zählbuttons wieder erscheinen.
+
+
 ## 1.5.1 – HUD-Anzeige auf Windows stabilisiert
 
 * Windows-HUD wird nach dem Erstellen erst sichtbar eingeblendet und danach

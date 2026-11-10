@@ -4,6 +4,15 @@ SquadLoot hostet eure Fortnite-Truhenstatistiken lokal auf dem Raspberry Pi.
 Der Code ist als öffentliche Release-Quelle gedacht; **keine echten Zugangsdaten
 werden in Git gespeichert**.
 
+## SquadLoot v1.5.2: automatische Erkennung ohne manuelle Zählbuttons
+
+Im Windows-Dashboard und in Live-Tracking gibt es keine Kiste+/Kiste−-,
+Munition+-, Obstbox+- oder Zerstört+-Buttons mehr. Die Anzeigen stammen aus
+der visuellen Erkennung beziehungsweise den später bestätigten Replays.
+Neue Runde, Replay auswerten und vorläufige Werte zurücksetzen bleiben.
+Ältere API-Daten und persistente SQLite-Matches bleiben erhalten. Der neue
+Visual-Counter-Test und Claudes Mini-HUD funktionieren weiter unverändert.
+
 ## SquadLoot v1.5.0: Mini-HUD und visueller Live-Test
 
 * Claudes kompaktes, klickdurchlässiges **188 x 60 px Mini-HUD** (Standardmodus),

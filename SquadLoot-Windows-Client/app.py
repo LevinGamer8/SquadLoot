@@ -1740,7 +1740,7 @@ NAV = (
 
 PAGE_META = {
     'dashboard': ('Dashboard', 'Dein Squad, deine Kisten, in Echtzeit.'),
-    'live': ('Live-Tracking', 'Manuell zählen oder die Beta-Bildschirmerkennung nutzen.'),
+    'live': ('Live-Tracking', 'Automatische Erkennung und Replay-Abgleich.'),
     'history': ('Match-Historie', 'Alle vom Replay bestätigten Runden.'),
     'squad': ('Squad', 'Wer trägt wie viel zum Squad-Ergebnis bei.'),
     'settings': ('Einstellungen', 'Verbindung, Konten und Erkennung konfigurieren.'),
@@ -2175,7 +2175,7 @@ class Gui:
         self.dash_state = Pill(status.body, 'Tracking inaktiv', T.MUTE, T.SURFACE_2,
                                bg=T.SURFACE)
         self.dash_state.pack(anchor='w')
-        self.dash_counts = tk.StringVar(value='0 manuell · 0 erkannt')
+        self.dash_counts = tk.StringVar(value='0 automatisch erkannt')
         tk.Label(status.body, textvariable=self.dash_counts, bg=T.SURFACE, fg=T.TEXT,
                  font=font(13), anchor='w').pack(fill='x', pady=(T.S3, 0))
         self.dash_event = tk.StringVar(value='Noch kein erkanntes Ereignis.')
@@ -2184,12 +2184,8 @@ class Gui:
                  wraplength=px(300)).pack(fill='x', pady=(px(2), T.S3))
         row = tk.Frame(status.body, bg=T.SURFACE)
         row.pack(fill='x')
-        Button(row, 'Truhe', lambda: self.core.adjust('manual', 1), 'primary',
-               icon='plus', bg=T.SURFACE).pack(side='left')
-        Button(row, '', lambda: self.core.adjust('manual', -1), 'secondary',
-               icon='minus', width=T.BTN_H, bg=T.SURFACE).pack(side='left', padx=px(6))
-        Button(row, 'Live-Tracking', lambda: self.show_page('live'), 'ghost',
-               bg=T.SURFACE).pack(side='left')
+        Button(row, 'Live-Tracking', lambda: self.show_page('live'), 'secondary',
+               icon='target', bg=T.SURFACE).pack(side='left')
 
         actions = Card(side)
         actions.pack(fill='x', pady=(T.S3, 0))
@@ -2230,7 +2226,7 @@ class Gui:
         text.pack(side='left', fill='x', expand=True)
         label(text, 'Aktueller Zählstand', 15, 'bold', bg=T.SURFACE,
               anchor='w').pack(fill='x')
-        self.live_sub = tk.StringVar(value='Manuelle Zählung ist immer eine Schätzung.')
+        self.live_sub = tk.StringVar(value='Live-Schätzungen werden nach dem Match per Replay bestätigt.')
         tk.Label(text, textvariable=self.live_sub, bg=T.SURFACE, fg=T.MUTE,
                  font=font(11), anchor='w').pack(fill='x', pady=(px(2), 0))
         self.live_state = Pill(row, 'Tracking inaktiv', T.MUTE, T.SURFACE_2, bg=T.SURFACE)
@@ -2240,11 +2236,9 @@ class Gui:
         counters.pack(fill='x', pady=(T.S4, 0))
         self.live_tiles = {}
         tiles = (
-            ('manual', 'Manuell', 'chest', T.ACCENT, T.TINT_ACCENT),
-            ('vision', 'Erkannt', 'bolt', T.WARN, T.TINT_WARN),
-            ('destroyed', 'Zerstört', 'burst', T.BAD, T.TINT_BAD),
-            ('ammo', 'Munition', 'ammo', T.CYAN, T.TINT_CYAN),
-            ('food', 'Obst', 'food', T.OK, T.TINT_OK),
+            ('vision', 'Live erkannt', 'bolt', T.WARN, T.TINT_WARN),
+            ('squad', 'Squad aktuell', 'users', T.CYAN, T.TINT_CYAN),
+            ('verified', 'Replay bestätigt', 'check', T.OK, T.TINT_OK),
         )
         for i, (key, title, icon, tone, tint) in enumerate(tiles):
             tile = MiniStat(counters, title, icon, tone, tint, bg=T.SURFACE)
@@ -2258,35 +2252,27 @@ class Gui:
         columns.grid_columnconfigure(1, weight=1, uniform='live2')
         columns.grid_rowconfigure(0, weight=1)
 
-        manual = Card(columns)
-        manual.grid(row=0, column=0, sticky='new', padx=(0, T.S3))
-        section_head(manual.body, 'Manuelle Steuerung',
-                     'Zuverlässigste Zählung während der Runde.')
-        pad = tk.Frame(manual.body, bg=T.SURFACE)
-        pad.pack(fill='x')
-        controls = (
-            ('Truhe', lambda: self.core.adjust('manual', 1), 'plus', 'primary'),
-            ('Truhe entfernen', lambda: self.core.adjust('manual', -1), 'minus', 'secondary'),
-            ('Zerstört', self.destroyed, 'burst', 'secondary'),
-            ('Munition', lambda: self.core.adjust('ammo', 1), 'ammo', 'secondary'),
-            ('Obstbox', lambda: self.core.adjust('food', 1), 'food', 'secondary'),
-            ('Zurücksetzen', self.confirm_reset, 'refresh', 'danger'),
-        )
-        for i, (title, callback, icon, variant) in enumerate(controls):
-            Button(pad, title, callback, variant, icon=icon, bg=T.SURFACE).grid(
-                row=i // 2, column=i % 2, sticky='ew',
-                padx=(0 if i % 2 == 0 else px(6), 0), pady=px(3))
-        pad.grid_columnconfigure(0, weight=1)
-        pad.grid_columnconfigure(1, weight=1)
-        divider(manual.body)
-        label(manual.body, 'Runde & Replay', 12, 'bold', fg=T.DIM, bg=T.SURFACE,
-              anchor='w').pack(fill='x', pady=(0, T.S3))
-        ops = tk.Frame(manual.body, bg=T.SURFACE)
-        ops.pack(fill='x')
+        roundtools = Card(columns)
+        roundtools.grid(row=0, column=0, sticky='new', padx=(0, T.S3))
+        section_head(roundtools.body, 'Runde und Replay',
+                     'Keine manuelle Kistenzählung nötig. Visuelle Werte '
+                     'werden nach dem Match durch das Replay ersetzt.')
+        ops = tk.Frame(roundtools.body, bg=T.SURFACE)
+        ops.pack(fill='x', pady=(T.S3, 0))
         Button(ops, 'Neue Squad-Runde', self.start_round, 'secondary', icon='spark',
-               bg=T.SURFACE).pack(side='left')
+               bg=T.SURFACE).pack(anchor='w', fill='x', pady=(0, px(6)))
         Button(ops, 'Replay auswerten', self.run_chestcounter, 'secondary', icon='film',
-               bg=T.SURFACE).pack(side='left', padx=(px(6), 0))
+               bg=T.SURFACE).pack(anchor='w', fill='x')
+        divider(roundtools.body)
+        label(roundtools.body,
+              'Falls eine Beta-Erkennung falsche Kisten gezählt hat, '
+              'kannst du nur die vorläufigen Werte zurücksetzen. '
+              'Bereits gespeicherte Matches bleiben erhalten.',
+              11, fg=T.MUTE, bg=T.SURFACE, anchor='w', justify='left',
+              wraplength=px(330)).pack(fill='x', pady=(0, T.S3))
+        Button(roundtools.body, 'Live-Schätzung zurücksetzen',
+               self.confirm_reset, 'ghost', icon='refresh',
+               bg=T.SURFACE).pack(anchor='w')
 
         vision = Card(columns)
         vision.grid(row=0, column=1, sticky='new')
@@ -2387,7 +2373,7 @@ class Gui:
         rows.pack(fill='x')
         items = (
             ('bolt', T.WARN, T.TINT_WARN, 'Geschätzt',
-             'Manuelle Klicks und Bildschirmerkennung während der Runde.'),
+             'Visuelle Erkennung während der Runde, noch nicht bestätigt.'),
             ('check', T.OK, T.TINT_OK, 'Replay bestätigt',
              'Von ChestCounter aus deinem Replay gelesen — verbindlich.'),
             ('signal', T.CYAN, T.TINT_CYAN, 'Live übertragen',
@@ -3085,10 +3071,6 @@ class Gui:
             self.visual_bridge.reset_baseline()
             self.set_status('Lokale Zähler zurückgesetzt.', T.DIM)
 
-    def destroyed(self):
-        self.core.adjust('manual', 1)
-        self.core.adjust('destroyed', 1)
-
     # ---- external visual chest counter (opt-in) ------------------------
     def visual_folder_caption(self):
         folder = self.core.config.get('visual_counter_dir', '')
@@ -3323,7 +3305,7 @@ class Gui:
         self.stats['mine'].set(
             own_verified if own_verified is not None else personal,
             'Replay bestätigt' if own_verified is not None
-            else f'{manual} manuell · {vision_count} erkannt')
+            else f'{vision_count} visuell erkannt · vorläufig')
         self.stats['squad'].set(
             squad_total,
             f"{totals['confirmed']} bestätigt · {totals['estimated']} geschätzt"
@@ -3349,11 +3331,9 @@ class Gui:
                             compact=True)
 
         # -- live tracking -----------------------------------------------
-        self.live_tiles['manual'].set(manual)
         self.live_tiles['vision'].set(vision_count)
-        self.live_tiles['destroyed'].set(destroyed)
-        self.live_tiles['ammo'].set(ammo)
-        self.live_tiles['food'].set(food)
+        self.live_tiles['squad'].set(squad_total)
+        self.live_tiles['verified'].set(own_verified if own_verified is not None else '–')
         running = self.vision_running()
         external_running = self.visual_bridge.running
         if current:
@@ -3364,8 +3344,9 @@ class Gui:
             tracking, tone, tint = 'Tracking inaktiv', T.MUTE, T.SURFACE_2
         self.live_state.set(tracking, tone, tint)
         self.dash_state.set(tracking, tone, tint)
-        self.dash_counts.set(f'{manual} manuell · {vision_count} erkannt'
-                             + (f' · Squad {squad_total}' if members else ''))
+        self.dash_counts.set(f'{vision_count} visuell erkannt'
+                             + (f' · Squad {squad_total}' if members else '')
+                             + (' · vorläufig' if current else ''))
         self.live_sub.set(
             f'Runde #{current} · {len(members)} Spieler · Squad {squad_total} Truhen'
             if current else 'Starte ein Match oder eine neue Squad-Runde.')

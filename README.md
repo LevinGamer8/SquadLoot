@@ -4,6 +4,28 @@ SquadLoot hostet eure Fortnite-Truhenstatistiken lokal auf dem Raspberry Pi.
 Der Code ist als öffentliche Release-Quelle gedacht; **keine echten Zugangsdaten
 werden in Git gespeichert**.
 
+## SquadLoot v1.5.5 – Monitorvorschau und zuverlässiger Replay-Abgleich
+
+**Live-Tracking → Bildschirmquelle** bietet jetzt *Automatisch (Fortnite-Fenster
+erkennen)* oder feste Monitore wie **Monitor 2**. Über **Vorschau aktualisieren**
+siehst du einen lokalen, einmalig aufgenommenen Screenshot der gewählten Quelle.
+Keine Bilder werden hochgeladen; die Auswahl wird pro Windows-PC gespeichert
+und beim nächsten Live-Start verwendet.
+
+**Replay-Analyse:** „Replay auswerten“ wartet auf eventuell laufende Scans,
+erkennt konkurrierende ChestCounter-Instanzen, kann bereits bekannte Matches
+erneut an den Pi senden und zeigt Upload-Fehler statt falscher Erfolgsmeldungen.
+Eine fehlgeschlagene Replay-Übertragung legt nicht mehr gleichzeitig das
+Live-Tracking lahm. Unter Einstellungen gibt es **Replay-Diagnose** für die
+Fehlersuche bei anderen Squad-Mitgliedern.
+
+Der englische XP-Detektor bleibt verfügbar. Die deutsche Worterkennung braucht
+auf neuen Installationen weiterhin eine echte kalibrierte „TRUHE“-Vorlage;
+der sprachunabhängige Objekthinweis ist keine garantierte Alternative. Für
+echte Genauigkeitsaussagen sind Gameplay-Tests nötig.
+
+[Testanleitung und Diagnose](docs/SQUADLOOT-RELIABILITY-HOTFIX.md)
+
 ## SquadLoot v1.5.4 – Einfach Replay + ein Klick für Live
 
 Das Windows-Fenster hat im Bereich **Live-Tracking** nur noch die wichtigsten

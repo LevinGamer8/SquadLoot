@@ -236,6 +236,24 @@ class DesktopSmokeTests(unittest.TestCase):
             self.pump()
         self.assertEqual(app.UNKNOWN_ICONS, set())
 
+    def test_08_live_monitor_selector_shows_thumbnail(self):
+        from unittest.mock import patch
+        from vision import _ppm_from_bgra
+        self.gui.show_page('live')
+        with patch('app.list_capture_monitors', return_value=[
+                    (0, 0, 1920, 1080), (1920, 0, 2560, 1440)]):
+            self.gui.refresh_live_monitors()
+        label = next(text for text, index in self.gui.live_monitor_values.items()
+                     if index == 2)
+        self.gui.live_monitor_var.set(label)
+        self.assertIn('Monitor 2', self.gui.live_monitor_var.get())
+        screenshot = _ppm_from_bgra(bytes([0, 0, 255, 0, 0, 255, 0, 0]), 2, 1)
+        self.gui._show_live_monitor_preview(self.gui.monitor_preview_seq, 2, screenshot)
+        self.assertEqual(self.gui.monitor_preview_image.width(), 2)
+        self.assertEqual(self.gui.monitor_preview_image.height(), 1)
+        self.assertIn('Monitor 2', self.gui.monitor_note.get())
+        self.assertEqual(app.UNKNOWN_ICONS, set())
+
 
 if __name__ == '__main__':
     unittest.main()

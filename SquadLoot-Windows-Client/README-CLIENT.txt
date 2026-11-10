@@ -88,3 +88,57 @@ Farbbedeutung, ueberall gleich:
 
 Einstellungen und Datenbank bleiben unveraendert; es ist keine Neueinrichtung
 noetig. Das Update kommt wie gewohnt automatisch vom Pi.
+
+
+SQUADLOOT 1.5.0 - IN-GAME-HUD
+==================================
+
+Neu ist ein kleines Overlay fuers Spiel. Standardmaessig AUS.
+
+Einschalten
+-----------
+Dashboard -> Schnellaktion 'In-Game-HUD', oder
+Einstellungen -> In-Game-HUD -> 'HUD anzeigen'.
+
+Was es zeigt (Kompaktmodus, 188 x 60 Pixel bei 100% Skalierung)
+---------------------------------------------------------------
+  [Truhe]  64        [Person] 17        (Punkt oben rechts)
+           SQUAD              DU
+
+  Grosse Zahl  = Truhen des gesamten Squads
+  Kleine Zahl  = deine eigenen Truhen
+  Punkt        = gruen verbunden, rot Fehler, grau nicht eingerichtet
+
+  Cyan  = Live-Schaetzung, noch nicht bestaetigt
+  Gruen = vom Replay bestaetigt
+
+Erweiterter Modus zeigt zusaetzlich eine Zeile je Spieler mit Haken
+(Replay bestaetigt) oder Blitz (Schaetzung).
+
+Bedienung
+---------
+  Strg+Alt+H   HUD anzeigen / ausblenden
+  Strg+Alt+L   sperren / entsperren
+  Strg+Alt+E   kompakt / erweitert
+Alle drei Kuerzel sind in den Einstellungen frei aenderbar. Ein Kuerzel ohne
+Strg/Alt/Shift wird abgelehnt, damit keine Fortnite-Taste belegt wird.
+
+Gesperrt (Standard): Mausklicks gehen durch das HUD hindurch ins Spiel.
+Entsperrt: HUD bekommt einen blauen Rahmen und laesst sich mit der Maus
+ziehen; Rechtsklick oeffnet ein kleines Menue.
+
+Wichtig
+-------
+1. Fortnite im RANDLOSEN FENSTERMODUS spielen. Im exklusiven Vollbild zeigt
+   Windows keine normalen Overlays an - das betrifft jedes Overlay, nicht nur
+   SquadLoot.
+2. Das HUD nicht in die Bildschirmmitte ziehen, wenn die Live-Erkennung
+   laeuft: dort macht SquadLoot seine Ausschnitte. Die Einstellungsseite warnt,
+   wenn das HUD in diesem Bereich liegt. 'Position zuruecksetzen' legt es
+   wieder oben links ab.
+3. Deckkraft und Groesse sind in den Einstellungen einstellbar.
+4. Die Position bleibt ueber Neustarts erhalten und wird auf einen sichtbaren
+   Monitor zurueckgeholt, falls sich die Aufloesung aendert.
+
+Kein DirectX-Hook, keine Code-Injektion, kein Zugriff auf den Fortnite-Prozess.
+Nur normale Windows-Fensterfunktionen.

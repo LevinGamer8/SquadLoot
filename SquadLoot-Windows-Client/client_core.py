@@ -39,7 +39,13 @@ def default_config():
     return {'client_id':str(uuid.uuid4()),'server_url':'','token':'','name':'',
             'data_json':str(CHESTCOUNTER),'replay_dir':str(REPLAYDIR),
             'chestcounter_exe':'','vision_template':'','vision_enabled':False,'interact_key':'E',
-            'cf_access_client_id':'','cf_access_client_secret':'','auto_update':True}
+            'cf_access_client_id':'','cf_access_client_secret':'','auto_update':True,
+            # In-game HUD. Older config.json files simply lack these keys; the UI
+            # falls back to the same defaults, so nothing has to be migrated.
+            'hud_enabled':False,'hud_mode':'compact','hud_opacity':0.92,'hud_scale':1.0,
+            'hud_locked':True,'hud_x':None,'hud_y':None,
+            'hud_hotkey_toggle':'Ctrl+Alt+H','hud_hotkey_lock':'Ctrl+Alt+L',
+            'hud_hotkey_mode':'Ctrl+Alt+E'}
 
 
 def validate_url(url):

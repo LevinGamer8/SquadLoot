@@ -1,5 +1,85 @@
 # Changelog
 
+## 1.5.0 — Neues In-Game-HUD
+
+Das alte Overlay war ein kleines Anwendungsfenster (330 × 220 px) mit
+Überschrift, Spielerliste und Buttons. Es ist durch ein echtes Spiel-HUD
+ersetzt.
+
+### Kompaktmodus (Standard)
+
+* **188 × 60 px** bei 100 % Anzeigeskalierung statt 330 × 220 px — rund 84 %
+  weniger Fläche.
+* Nur noch drei Dinge: Squad-Truhen groß, eigene Truhen kleiner daneben, ein
+  kleiner Statuspunkt. Keine Überschrift, kein Spielername, keine Buttons.
+* Cyan für Live-Schätzungen, Grün für replay-bestätigte Werte, gedämpft wenn
+  keine Runde läuft. Der Statuspunkt zeigt Verbindung, Fehler oder „nicht
+  eingerichtet“ ohne Textwarnung.
+* Die Karte wächst mit vierstelligen Zahlen, statt Text abzuschneiden.
+
+### Erweiterter Modus
+
+* Zusätzlich eine Zeile je Spieler: Punkt, Name, Zahl und ein Marker
+  (Haken = Replay bestätigt, Blitz = Schätzung).
+* Umschalten per Tastenkürzel, Rechtsklick-Menü oder Einstellungen — ohne das
+  Spiel zu verlassen.
+
+### Overlay-Verhalten (Windows)
+
+* Randloses Fenster ohne Titelleiste und ohne Taskleisten-Eintrag
+  (`overrideredirect` + `WS_EX_TOOLWINDOW`).
+* Echte Transparenz um die Karte über einen Farbschlüssel, konfigurierbare
+  Deckkraft (35–100 %) und Größe (80–160 %).
+* **Gesperrt:** Mausklicks gehen durch das HUD ins Spiel
+  (`WS_EX_LAYERED | WS_EX_TRANSPARENT`). **Entsperrt:** Akzentrahmen,
+  Griffpunkte, mit der Maus verschiebbar.
+* Immer im Vordergrund, ohne dem Spiel den Fokus zu nehmen
+  (`WS_EX_NOACTIVATE`, periodisches `SetWindowPos(HWND_TOPMOST)`).
+* Position wird gespeichert und beim Start gegen die aktuelle Bildschirmfläche
+  aller Monitore geklemmt — eine Position auf einem entfernten Monitor kommt
+  zurück ins Bild.
+* DPI-bewusst: skaliert mit 100 %, 125 %, 150 % und 200 % mit.
+* Optionale globale Tastenkürzel (`RegisterHotKey`), Standard
+  `Strg+Alt+H` (anzeigen), `Strg+Alt+L` (sperren), `Strg+Alt+E` (Modus).
+  Kürzel ohne Modifikator werden abgelehnt, damit keine Spieltaste belegt wird.
+* Keine Code-Injektion, kein DirectX-Hook, kein Zugriff auf den
+  Fortnite-Prozess — ausschließlich dokumentierte Fenster-APIs.
+
+### Einstellungen
+
+* Neuer Abschnitt „In-Game-HUD“: anzeigen, kompakt/erweitert, Deckkraft,
+  Größe, Sperre, Position zurücksetzen, Vorschau und die drei Tastenkürzel.
+* Warnt, wenn das HUD im Bereich liegt, den die Bildschirmerkennung abtastet.
+* Sagt auf Nicht-Windows-Systemen klar, welche Funktionen dort ohne Wirkung
+  bleiben.
+* Neues `Slider`-Bedienelement im bestehenden Designsystem.
+
+### Performance
+
+* Gezeichnet wird nur bei einer echten Wertänderung. Gemessen über 20 Sekunden
+  mit laufender Runde und unveränderten Zahlen: **0 Neuzeichnungen**.
+* Kein eigener Timer; das HUD hängt am bestehenden Sekundentakt.
+* Zusätzlicher Speicherbedarf rund **0,3 MB**.
+
+### Kompatibilität
+
+* Keine neuen Client-Dateien — die Update-Dateiliste bleibt unverändert, schon
+  installierte Clients aktualisieren weiterhin automatisch.
+* Neue `hud_*`-Einstellungen sind optional; bestehende `config.json`-Dateien
+  ohne diese Schlüssel verwenden dieselben Standardwerte.
+* Das HUD ist standardmäßig **aus** und erscheint erst, wenn man es einschaltet.
+* Server-API, Replay-Synchronisierung, Match-Historie, Cloudflare Access und
+  beide Auto-Updater sind unverändert.
+
+### Tests
+
+* Neu: `tests/test_hud_overlay.py` (36 Tests) — Tastenkürzel-Parsing,
+  Konfigurationsstandards und Abwärtskompatibilität, Geometrie bei 100–160 %,
+  Klemmen auf sichtbare Monitore, Positionspersistenz, Ziehen gesperrt/entsperrt,
+  Neuzeichnen nur bei Änderung, Farbsemantik, sauberes Beenden und die
+  Windows-Fallbacks.
+
+
 ## 1.4.0 — Komplett neu gestaltete Oberfläche
 
 ### Windows-Client

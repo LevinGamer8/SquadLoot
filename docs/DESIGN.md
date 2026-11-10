@@ -90,7 +90,68 @@ Jede Pixelangabe läuft durch `px()`, jede Schriftgröße durch `font()` mit
 Pixelmaß. Dadurch skalieren Layout und Typo gemeinsam auf 125 %, 150 % und
 200 %. `SQUADLOOT_UI_SCALE` erzwingt einen Wert für Tests.
 
-## 6. Bewusste Entscheidungen
+## 6. In-Game-HUD
+
+Das Overlay ist ein eigenes, sehr kleines Element im selben System. Es lebt in
+`app.py` (`class Hud`) und besteht aus einem `tk.Toplevel` mit `overrideredirect`
+und einer einzigen `tk.Canvas`.
+
+**Kompakt (Standard, 188 × 60 px bei 100 %):** Truhenzahl des Squads groß,
+eigene Zahl kleiner daneben, ein Statuspunkt oben rechts. Sonst nichts — keine
+Überschrift, keine Buttons, kein Spielername.
+
+**Erweitert:** darunter eine Zeile je Spieler mit Punkt, Name, Zahl und einem
+Marker (Haken = vom Replay bestätigt, Blitz = Schätzung).
+
+Farben folgen der Semantik aus Abschnitt 1: Cyan für Live-Schätzungen, Grün für
+replay-bestätigte Werte, gedämpft wenn keine Runde läuft. Der Statuspunkt ist
+grün bei Verbindung, rot bei Fehler, gedämpft wenn nichts eingerichtet ist.
+
+**Breite:** aus der Textbreite berechnet, Minimum 188 px. Vierstellige Zahlen
+lassen die Karte wachsen statt den Text abzuschneiden.
+
+**Zustände:** gesperrt = klick-durchlässig (Windows `WS_EX_TRANSPARENT`),
+entsperrt = Akzentrahmen plus Griffpunkte und mit der Maus verschiebbar.
+Rechtsklick öffnet ein kleines Menü (Modus, Sperre, Position, Ausblenden).
+
+### Windows-Fensterstile
+
+| Zweck | Mechanismus |
+|---|---|
+| Kein Rahmen, kein Taskleisten-Eintrag | `overrideredirect(True)` + `WS_EX_TOOLWINDOW` |
+| Transparenz um die Karte | `attributes('-transparentcolor', '#010203')` |
+| Deckkraft | `attributes('-alpha', …)` |
+| Klick-durchlässig | `WS_EX_LAYERED | WS_EX_TRANSPARENT` |
+| Kein Fokusklau | `WS_EX_NOACTIVATE` |
+| Immer oben | `attributes('-topmost')` + `SetWindowPos(HWND_TOPMOST)` alle ~10 s |
+| Globale Kürzel | `RegisterHotKey` in einem eigenen Thread mit Message-Loop |
+
+Alles davon sind dokumentierte Fenster-APIs. Es gibt keinen DirectX-Hook, keine
+Code-Injektion und keinen Zugriff auf den Fortnite-Prozess.
+
+Auf anderen Systemen fallen diese Aufrufe auf No-ops zurück: das HUD erscheint
+dort als normales randloses Fenster, Klicks gehen nicht durch und globale Kürzel
+gibt es nicht. Die Einstellungsseite sagt das ausdrücklich.
+
+### Positionierung
+
+Die Position liegt in `hud_x` / `hud_y` und wird bei jedem Anzeigen gegen die
+aktuelle Bildschirmfläche geklemmt (unter Windows über
+`SM_XVIRTUALSCREEN…SM_CYVIRTUALSCREEN`, also inklusive aller Monitore). Eine auf
+einem entfernten Monitor gespeicherte Position kommt dadurch zurück ins Bild.
+Die Standardposition liegt oben links, bewusst außerhalb des Bereichs, den
+`vision.py` abtastet (26–74 % Breite, 29–72 % Höhe); liegt das HUD doch darin,
+warnt die Einstellungsseite.
+
+### Performance
+
+Gezeichnet wird nur, wenn sich eine angezeigte Zahl, der Modus, die Skalierung
+oder der Sperrzustand ändert. Dafür vergleicht `redraw()` eine Signatur aller
+sichtbaren Werte. Ein offenes HUD mit unveränderten Werten zeichnet null Mal
+und hat keinen eigenen Timer — es hängt am bestehenden Sekundentakt des
+Hauptfensters.
+
+## 7. Bewusste Entscheidungen
 
 * **Kein CustomTkinter, kein Electron.** Das Designsystem ist mit `tk.Canvas`
   gebaut. Das hält die Installation (`SQUADLOOT_INSTALLIEREN.ps1`), den

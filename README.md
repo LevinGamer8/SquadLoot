@@ -21,6 +21,24 @@ Weitere Ansichten: [Squad](docs/screenshots/windows-squad.png) ·
 [Updates](docs/screenshots/windows-updates.png) ·
 [Mobil](docs/screenshots/web-mobile.png)
 
+### In-Game-HUD
+
+Ab 1.5.0 gibt es ein eigenes Overlay fürs Spiel: 188 × 60 Pixel bei 100 %
+Anzeigeskalierung, nur Squad-Truhen, eigene Truhen und ein Statuspunkt.
+
+![HUD kompakt](docs/screenshots/hud-compact.png)
+![HUD erweitert](docs/screenshots/hud-expanded.png)
+
+Oben kompakt (Standard), darunter erweitert mit einer Zeile je Spieler — beide
+in Originalgröße. [Entsperrt](docs/screenshots/hud-unlocked.png) ·
+[Skalierung 100–200 %](docs/screenshots/hud-dpi.png) ·
+[Einstellungen](docs/screenshots/hud-settings.png) ·
+[Größenvergleich auf 1920 × 1080](docs/screenshots/hud-in-context.png)
+
+Einschalten unter *Einstellungen → In-Game-HUD* oder über die Schnellaktion
+*In-Game-HUD* auf dem Dashboard. Fortnite muss im randlosen Fenstermodus
+laufen; exklusives Vollbild zeigt keine Windows-Overlays an.
+
 ## GitHub Release veröffentlichen
 
 Der GitHub Actions Workflow `.github/workflows/server-release.yml` erstellt bei

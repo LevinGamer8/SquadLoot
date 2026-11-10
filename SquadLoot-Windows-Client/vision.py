@@ -598,6 +598,16 @@ _ALLOWED_REDIRECT_HOSTS = frozenset({
 })
 
 
+def managed_replay_data_file(config):
+    """ChestCounter --data always writes <folder>/data.json, never a custom basename."""
+    configured = config.get('data_json') or str(
+        Path(os.getenv('APPDATA') or Path.home()) / 'ChestCounter' / 'data.json')
+    path = Path(configured)
+    if path.is_dir():
+        return path / 'data.json'
+    return path if path.name.lower() == 'data.json' else path.parent / 'data.json'
+
+
 def _safe_archive_member(name):
     """Reject archive traversal and dangerous files before unpacking."""
     if not isinstance(name, str) or '\\' in name or '\x00' in name:
@@ -818,7 +828,16 @@ class ManagedReplayEngine:
 
     def scan_once(self, force=False):
         """Run at most one CLI analyzer concurrently; never block GUI thread."""
-        if not self._busy.acquire(blocking=False):
+        # Manual evaluation must wait for the background analyzer; otherwise
+        # the UI uploads yesterday's JSON and incorrectly reports success.
+        if force:
+            acquired = self._busy.acquire(timeout=250)
+        else:
+            acquired = self._busy.acquire(blocking=False)
+        if not acquired:
+            if force:
+                self.error = 'Replay-Analyse ist noch beschäftigt (Timeout).'
+                self.status = self.error
             return False
         try:
             signature = self._signature()
@@ -833,9 +852,7 @@ class ManagedReplayEngine:
             self.last_attempt = now
             self.status = 'Replay-Analyse wird vorbereitet'
             exe = self.store.ensure_replay()
-            datafile = Path(self.core.config.get('data_json') or
-                            str(Path(os.getenv('APPDATA') or Path.home()) /
-                                'ChestCounter' / 'data.json'))
+            datafile = managed_replay_data_file(self.core.config)
             datafile.parent.mkdir(parents=True, exist_ok=True)
             cmd = [str(exe), '--once', '--data', str(datafile.parent),
                    '--demos', str(self.core.config.get('replay_dir')), '--lang', 'en']
@@ -846,10 +863,25 @@ class ManagedReplayEngine:
             if result.returncode != 0:
                 hint = result.stderr.decode('utf-8', 'replace')[-180:]
                 raise RuntimeError(f'Replay-Analyse Exit {result.returncode}: {hint}')
+            output = result.stdout.decode('utf-8', 'replace').casefold()
+            # ChestCounter exits with code 0 even if a second instance could
+            # not acquire its data-folder mutex. In that case nothing was read.
+            if any(message in output for message in
+                   ('already open', 'déjà ouvert', 'ya está abierto')):
+                raise RuntimeError('ChestCounter ist bereits geöffnet. '
+                                   'Schließe die alte Instanz und versuche es erneut.')
+            unreadable = any(text in output for text in
+                ('cannot read this replay', 'unreadable replay',
+                 'replay(s) illisible', 'no se puede leer esta repetición'))
             self.last_sig = signature
             self.finished += 1
-            self.error = ''
-            self.status = 'Replays ausgewertet – Synchronisierung läuft'
+            self.error = ('Ein oder mehrere Replays waren nicht lesbar. '
+                          '%APPDATA%\\ChestCounter\\errors.log prüfen.'
+                          if unreadable else '')
+            self.status = (self.error if unreadable else
+                           'Replay-Scan abgeschlossen – Synchronisierung läuft'
+                           if datafile.is_file() else
+                           'Replay-Scan beendet – keine auswertbaren Matches exportiert')
             return True
         except Exception as exc:
             self.error = str(exc)[:240]
@@ -873,6 +905,171 @@ class ManagedReplayEngine:
             self.thread.start()
 
 
+
+def _best_monitor_for_windows(monitors, windows):
+    """Pick upstream FFmpeg's EnumDisplayMonitors index by intersection area."""
+    best_index, best_area = 1, 0
+    for index, (x, y, width, height) in enumerate(monitors, 1):
+        for left, top, right, bottom in windows:
+            area = max(0, min(x + width, right) - max(x, left)) * max(
+                0, min(y + height, bottom) - max(y, top))
+            if area > best_area:
+                best_area, best_index = area, index
+    return best_index
+
+
+def list_capture_monitors():
+    """Return exactly the Win32 monitor order used by the visual FFmpeg source.
+
+    Index 1..N is intentionally not reordered by primary monitor status.
+    """
+    if os.name != 'nt':
+        return []
+    from ctypes import wintypes
+    monitors = []
+    cb_type = ctypes.WINFUNCTYPE(
+        ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p,
+        ctypes.POINTER(wintypes.RECT), ctypes.c_void_p)
+
+    @cb_type
+    def callback(_monitor, _dc, rect, _data):
+        r = rect.contents
+        monitors.append((r.left, r.top, r.right - r.left, r.bottom - r.top))
+        return 1
+
+    if not ctypes.windll.user32.EnumDisplayMonitors(None, None, callback, None):
+        raise OSError('Windows konnte die angeschlossenen Monitore nicht lesen.')
+    return monitors
+
+
+def detect_fortnite_monitor():
+    """Use visible Fortnite window geometry only; never inspect game memory."""
+    if os.name != 'nt':
+        return 1
+    try:
+        from ctypes import wintypes
+        monitors = list_capture_monitors()
+        windows = []
+        user32 = ctypes.windll.user32
+        user32.IsWindowVisible.argtypes = [ctypes.c_void_p]
+        user32.IsIconic.argtypes = [ctypes.c_void_p]
+        user32.GetWindowTextW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_int]
+        user32.GetWindowRect.argtypes = [ctypes.c_void_p, ctypes.POINTER(wintypes.RECT)]
+        cb_type = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)
+
+        @cb_type
+        def callback(hwnd, _data):
+            if not user32.IsWindowVisible(hwnd) or user32.IsIconic(hwnd):
+                return 1
+            title = ctypes.create_unicode_buffer(256)
+            user32.GetWindowTextW(hwnd, title, 256)
+            name = title.value.strip().casefold()
+            if name != 'fortnite' and not name.startswith('fortnite '):
+                return 1
+            rect = wintypes.RECT()
+            if user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+                if rect.right - rect.left >= 480 and rect.bottom - rect.top >= 270:
+                    windows.append((rect.left, rect.top, rect.right, rect.bottom))
+            return 1
+
+        user32.EnumWindows(callback, None)
+        return _best_monitor_for_windows(monitors, windows)
+    except (OSError, ValueError, AttributeError):
+        return 1
+
+
+def _ppm_from_bgra(pixels, width, height):
+    """Small local-only PPM image for Tkinter; no Pillow/third-party download."""
+    width, height = int(width), int(height)
+    if not (0 < width <= 1200 and 0 < height <= 800):
+        raise ValueError('Ungültige Größe für die Monitorvorschau.')
+    if len(pixels) != width * height * 4:
+        raise ValueError('Die Bildschirmaufnahme ist unvollständig.')
+    result = bytearray(width * height * 3)
+    for src in range(0, len(pixels), 4):
+        dst = (src // 4) * 3
+        result[dst:dst + 3] = pixels[src + 2:src + 3] + pixels[src + 1:src + 2] + pixels[src:src + 1]
+    return ('P6\n%d %d\n255\n' % (width, height)).encode('ascii') + result
+
+
+def capture_monitor_preview(index, max_width=520, max_height=292):
+    """Take one manually requested *local* Win32 thumbnail.
+
+    Uses a GDI snapshot, never sends or stores screenshots. Exclusive DirectX
+    fullscreen may show black: windowed fullscreen is recommended.
+    """
+    if os.name != 'nt':
+        raise RuntimeError('Die Bildschirmvorschau ist nur unter Windows verfügbar.')
+    monitors = list_capture_monitors()
+    index = int(index)
+    if not 1 <= index <= len(monitors):
+        raise ValueError('Ausgewählter Monitor ist nicht mehr angeschlossen.')
+    x, y, width, height = monitors[index - 1]
+    scale = min(float(max_width) / width, float(max_height) / height, 1.0)
+    out_w, out_h = max(1, int(width * scale)), max(1, int(height * scale))
+    user32, gdi = ctypes.windll.user32, ctypes.windll.gdi32
+    ptr = ctypes.c_void_p
+    user32.GetDC.argtypes, user32.GetDC.restype = [ptr], ptr
+    user32.ReleaseDC.argtypes = [ptr, ptr]
+    gdi.CreateCompatibleDC.argtypes, gdi.CreateCompatibleDC.restype = [ptr], ptr
+    gdi.CreateCompatibleBitmap.argtypes = [ptr, ctypes.c_int, ctypes.c_int]
+    gdi.CreateCompatibleBitmap.restype = ptr
+    gdi.SelectObject.argtypes, gdi.SelectObject.restype = [ptr, ptr], ptr
+    gdi.SetStretchBltMode.argtypes = [ptr, ctypes.c_int]
+    gdi.StretchBlt.argtypes = [ptr, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+        ctypes.c_int, ptr, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+        ctypes.c_int, ctypes.c_uint]
+    gdi.GetDIBits.argtypes = [ptr, ptr, ctypes.c_uint, ctypes.c_uint,
+        ptr, ptr, ctypes.c_uint]
+    gdi.DeleteDC.argtypes, gdi.DeleteObject.argtypes = [ptr], [ptr]
+
+    class BitmapInfoHeader(ctypes.Structure):
+        _fields_ = [
+            ('size', ctypes.c_uint32), ('width', ctypes.c_int32),
+            ('height', ctypes.c_int32), ('planes', ctypes.c_uint16),
+            ('bits', ctypes.c_uint16), ('compression', ctypes.c_uint32),
+            ('image_size', ctypes.c_uint32), ('xres', ctypes.c_int32),
+            ('yres', ctypes.c_int32), ('colors', ctypes.c_uint32),
+            ('important_colors', ctypes.c_uint32),
+        ]
+
+    src_dc = user32.GetDC(None)
+    if not src_dc:
+        raise OSError('Bildschirmaufnahme: Desktop-Kontext nicht verfügbar.')
+    mem_dc = bitmap = old = None
+    try:
+        mem_dc = gdi.CreateCompatibleDC(src_dc)
+        bitmap = gdi.CreateCompatibleBitmap(src_dc, out_w, out_h)
+        if not mem_dc or not bitmap:
+            raise OSError('Bildschirmaufnahme: Speicherbild konnte nicht angelegt werden.')
+        old = gdi.SelectObject(mem_dc, bitmap)
+        if not old:
+            raise OSError('Bildschirmaufnahme: Grafikobjekt nicht auswählbar.')
+        gdi.SetStretchBltMode(mem_dc, 3)
+        if not gdi.StretchBlt(mem_dc, 0, 0, out_w, out_h,
+                             src_dc, x, y, width, height, 0x00CC0020):
+            raise OSError('Windows konnte die Monitorvorschau nicht aufnehmen.')
+        # GetDIBits requires the bitmap to be deselected from its memory DC.
+        gdi.SelectObject(mem_dc, old)
+        old = None
+        header = BitmapInfoHeader(
+            ctypes.sizeof(BitmapInfoHeader), out_w, -out_h, 1, 32, 0,
+            out_w * out_h * 4, 0, 0, 0, 0)
+        pixels = ctypes.create_string_buffer(out_w * out_h * 4)
+        if not gdi.GetDIBits(src_dc, bitmap, 0, out_h,
+                             pixels, ctypes.byref(header), 0):
+            raise OSError('Windows konnte das Vorschaubild nicht auslesen.')
+        return _ppm_from_bgra(pixels.raw, out_w, out_h)
+    finally:
+        if old and mem_dc:
+            gdi.SelectObject(mem_dc, old)
+        if bitmap:
+            gdi.DeleteObject(bitmap)
+        if mem_dc:
+            gdi.DeleteDC(mem_dc)
+        user32.ReleaseDC(None, src_dc)
+
+
 class ManagedLiveEngine:
     """One button controls a private, headless visual detector subprocess."""
 
@@ -892,6 +1089,9 @@ class ManagedLiveEngine:
         self.last_event_at = None
         self._lock = threading.RLock()
         self.legacy_obs = core.config.get('visual_counter_dir', '')
+        self.monitor = 1
+        self.last_source = ''
+        self.warning = ''
 
     @property
     def running(self):
@@ -939,6 +1139,7 @@ class ManagedLiveEngine:
         self._stop.clear()
         self.state = 'Einrichtung'
         self.error = ''
+        self.warning = ''
         self.count = self.certain = self.last_raw = 0
         self.round_id = self.core.round_id
         with self.core.lock:
@@ -952,17 +1153,25 @@ class ManagedLiveEngine:
         try:
             def progress(value):
                 self.state = 'Live-Modul wird eingerichtet · %d %%' % value
+
             root = self.store.ensure_visual(progress=progress,
                                             previous_obs=self.legacy_obs)
             if self._stop.is_set():
                 return
-            # A previously calibrated German template is automatically reused.
-            languages = '["de"]' if self.store.german_available() else '["en", "pt"]'
+            german = self.store.german_available()
+            if not german:
+                self.warning = ('Deutsch ohne TRUHE-Kalibrierung nur eingeschränkt '
+                                'erkennbar; Englisch bleibt verfügbar')
+            # EN is always supported by the pinned upstream templates. DE
+            # additionally needs an actual calibrated TRUHE image; without
+            # one only its language-independent object cue can contribute.
+            languages = '["en", "de"]' if german else '["en"]'
             config = root / 'squadloot-live.toml'
             config.write_text(
                 '[detector]\n'
                 'languages = ' + languages + '\n'
                 'process_fps = 15\n'
+                'count_interaction_object_as_approx = true\n'
                 '[logging]\n'
                 'enabled = false\n'
                 '[capture]\n'
@@ -973,42 +1182,63 @@ class ManagedLiveEngine:
                            env.get('PATH', ''))
             env['PYTHONUNBUFFERED'] = '1'
             flags = getattr(_subprocess2, 'CREATE_NO_WINDOW', 0) if os.name == 'nt' else 0
+            override = self.core.config.get('live_monitor', 'auto')
+            try:
+                monitor = int(override)
+                if not 1 <= monitor <= 8:
+                    raise ValueError('Monitor außerhalb von 1..8')
+            except (TypeError, ValueError):
+                monitor = detect_fortnite_monitor()
+            self.monitor = monitor
             cmd = [str(python), '-m', 'fortnite_chest_counter',
                    'live', '--config', str(config),
-                   '--source', 'desktop', '--monitor', str(max(1, min(8,
-                       int(self.core.config.get('live_monitor', 1) or 1)))),
+                   '--source', 'desktop', '--monitor', str(monitor),
                    '--gui', '--reset',
                    '--state', str(root / 'state' / 'squadloot-live.json'),
                    '--obs-dir', str(root / 'obs_output')]
-            self.state = 'Bildanalyse startet'
-            self.process = _subprocess2.Popen(
-                cmd, stdin=_subprocess2.PIPE, stdout=_subprocess2.PIPE,
-                stderr=_subprocess2.DEVNULL, cwd=str(root), env=env,
-                creationflags=flags)
-            self.started = True
-            self.state = ('Live-Tracking aktiv · Deutsch (Beta)'
-                          if self.store.german_available() else
-                          'Live-Tracking aktiv · XP-Popup/Objekterkennung')
-            for raw in self.process.stdout:
-                if self._stop.is_set():
-                    break
-                if len(raw) > 20000:
-                    continue
-                try:
-                    event = _json.loads(raw.decode('utf-8', 'replace'))
-                except ValueError:
-                    continue
-                if event.get('type') in ('event', 'counts'):
-                    self.feed_message(event)
-                elif event.get('type') == 'error':
-                    self.error = str(event.get('text', ''))[:200]
-                    self.state = 'Erkennungsfehler'
-                elif event.get('type') == 'connected':
-                    self.state = 'Live-Tracking aktiv'
-            exit_code = self.process.wait(timeout=10)
+            self.state = f'Bildanalyse verbindet Monitor {monitor}'
+            error_log = root / 'squadloot-live-errors.log'
+            connected = False
+            # Save stderr instead of discarding the only actionable reason
+            # for missing FFmpeg, an invalid monitor or a runtime crash.
+            with error_log.open('wb') as stderr:
+                self.process = _subprocess2.Popen(
+                    cmd, stdin=_subprocess2.PIPE, stdout=_subprocess2.PIPE,
+                    stderr=stderr, cwd=str(root), env=env, creationflags=flags)
+                self.started = True
+                for raw in self.process.stdout:
+                    if self._stop.is_set():
+                        break
+                    if len(raw) > 20000:
+                        continue
+                    try:
+                        event = _json.loads(raw.decode('utf-8', 'replace'))
+                    except ValueError:
+                        continue
+                    if not isinstance(event, dict):
+                        continue
+                    kind = event.get('type')
+                    if kind in ('event', 'counts'):
+                        self.feed_message(event)
+                    elif kind == 'error':
+                        self.error = str(event.get('text', ''))[:200]
+                        self.state = 'Live-Erkennungsfehler'
+                    elif kind == 'warn':
+                        self.warning = str(event.get('text', ''))[:200]
+                    elif kind == 'connected':
+                        connected = True
+                        self.last_source = str(event.get('source', ''))[:120]
+                        self.state = f'Live-Tracking aktiv · Monitor {monitor}'
+                exit_code = self.process.wait(timeout=10)
             if not self._stop.is_set():
-                if exit_code:
-                    raise RuntimeError('Bildanalyse wurde beendet (Code %s).' % exit_code)
+                if exit_code or not connected:
+                    detail = error_log.read_bytes()[-1200:].decode(
+                        'utf-8', 'replace').strip()[-250:]
+                    reason = (f'Bildanalyse beendet (Code {exit_code})'
+                              if exit_code else
+                              'Bildanalyse ohne Monitor-Verbindung beendet')
+                    hint = self.error or detail
+                    raise RuntimeError(reason + (': ' + hint if hint else '.'))
                 self.state = 'Beendet'
         except Exception as exc:
             self.error = str(exc)[:240]

@@ -1,5 +1,41 @@
 # Changelog
 
+## 1.5.5 – Monitorvorschau und Replay-/Upload-Zuverlässigkeit
+
+- Automatische Monitorauswahl anhand des sichtbaren Fortnite-Fensters statt
+  stillschweigender Erkennung ausschließlich auf Monitor 1. Ein manuell
+  gesetzter `live_monitor`-Wert (1–8) hat weiterhin Vorrang.
+- Monitorauswahl als Dropdown im Live-Tab, mit Auflösung/Position je Display
+  und lokaler, einmalig aufgenommener Bildvorschau. Einstellung wird direkt
+  gespeichert; Änderungen werden beim nächsten Live-Start wirksam.
+  Die Bildvorschau benötigt nur Windows-GDI und kein Pillow.
+- Live-Erkennung prüft, ob sie tatsächlich eine Bildschirmquelle verbunden
+  hat; der letzte Fehler der Erkennungsengine wird lokal in
+  `%LOCALAPPDATA%\\SquadLoot\\engines\\VisualCounter-v0.2.3\\squadloot-live-errors.log`
+  aufbewahrt, anstatt STDERR vollständig zu verwerfen.
+- Englische Erkennung bleibt stets aktiv. Eine echte, zuvor kalibrierte
+  deutsche TRUHE-Vorlage wird zusätzlich verwendet, sofern vorhanden.
+  Ohne deutsche Vorlage bleibt die XP-Worterkennung für Deutsch experimentell;
+  der sprachunabhängige Objekt-Hinweis ersetzt keine validierte DE-Vorlage.
+- "Replay auswerten" wartet jetzt auf einen bereits laufenden Replay-Scan,
+  anstatt sofort eine alte `data.json` hochzuladen.
+- Erfolgscode 0 von einer *zweiten* ChestCounter-Instanz wird nicht mehr als
+  abgeschlossene Auswertung fehlinterpretiert.
+- Ein alter, abweichender Dateiname für `data_json` wird auf die tatsächliche
+  ChestCounter-Ausgabe `data.json` normalisiert. Einzelne unlesbare
+  Replays erscheinen als Warnung und blockieren keine anderen Uploads.
+- Eine Replay-Diagnose zeigt lokale Dateien, auswertbare Matches, gesendete Daten und Fehler ohne Credentials.
+- Replay-Upload, Live-Zähler und Serverstatus werden unabhängig abgefragt:
+  ein Upload-Fehler blockiert nicht mehr alle weiteren Aktualisierungen.
+- Parallele GUI-/Hintergrund-Uploads verwenden ein gemeinsames Lock, sodass dieselbe Match-Datei nicht mehrfach gesendet wird.
+- Replay-Schnellaktion und "Alle Replays synchronisieren" können bereits
+  übertragene, unveränderte Matches bewusst erneut senden, falls dem Pi
+  Daten fehlen; Server-Upserts bleiben idempotent.
+- Kein Eingriff in vorhandene Match-Historie, Tokens, Update-Formate oder
+  Fortnite-Prozessspeicher. Windows-/Fortnite-Praxistests für beide Sprachen
+  sind weiterhin erforderlich.
+
+
 ## 1.5.4 – Live-Tracking mit nur einem Button + automatische Replay-Auswertung
 
 - Vereinfachter Live-Tab: persönliche, Squad- und Replay-Zähler sowie

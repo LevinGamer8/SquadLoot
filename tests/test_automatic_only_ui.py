@@ -57,14 +57,14 @@ class AutomaticOnlyInterfaceTests(unittest.TestCase):
                           'Erkennung starten', 'self.vision_meter',
                           "'chestcounter_exe', 'Pfad zur"):
             self.assertNotIn(forbidden, APP)
-        self.assertIn('engine.scan_once(force=True)', APP)
+        self.assertIn('self.core.replay_sync_all(force=True)', APP)
         self.assertIn('self.core.replay_engine.start()', APP)
 
     def test_version_pair_stays_in_sync(self):
         win = (WINDOWS / 'VERSION').read_text(encoding='ascii').strip()
         pi = (ROOT / 'SquadLoot-Pi-Server' / 'VERSION').read_text(encoding='ascii').strip()
         self.assertEqual(win, pi)
-        self.assertEqual(win, '1.5.4')
+        self.assertEqual(win, '1.5.5')
 
 
 if __name__ == '__main__':

@@ -31,7 +31,8 @@ from tkinter import filedialog, font as tkfont, messagebox
 
 from client_core import (Core, CONFIG, read_json, sync_once, validate_url)
 from update_manager import current_version, check_and_stage, log_error
-from vision import ManagedLiveEngine
+from vision import (ManagedLiveEngine, list_capture_monitors,
+                    detect_fortnite_monitor, capture_monitor_preview)
 
 # --------------------------------------------------------------------------
 # Display scaling
@@ -1813,6 +1814,9 @@ class Gui:
         self.hotkey_note = ''
         self.hud_fields = {}
         self.live_engine = ManagedLiveEngine(self.core)
+        self.monitor_preview_seq = 0
+        self.monitor_preview_image = None
+        self.live_monitor_values = {}
         self.update_busy = False
         self.update_pending = False
         self.pending_version = ''
@@ -2246,6 +2250,43 @@ class Gui:
                  fg=T.MUTE, font=font(11), anchor='w', justify='left',
                  wraplength=px(780)).pack(fill='x', pady=(T.S3, 0))
 
+        source = Card(page, fill=T.SURFACE, border=T.LINE)
+        source.pack(fill='x', pady=(T.S2, T.S3))
+        section_head(source.body, 'Bildschirmquelle',
+                     'Wähle deinen Fortnite-Monitor und prüfe ihn per Bildvorschau.',
+                     bg=T.SURFACE)
+        picker = tk.Frame(source.body, bg=T.SURFACE)
+        picker.pack(fill='x', pady=(T.S3, T.S2))
+        self.live_monitor_var = tk.StringVar(value='Monitore laden …')
+        self.live_monitor_menu = tk.OptionMenu(picker, self.live_monitor_var,
+                                                'Monitore laden …')
+        self.live_monitor_menu.configure(
+            bg=T.FIELD, fg=T.TEXT, activebackground=T.SURFACE_3,
+            activeforeground=T.TEXT, highlightthickness=0,
+            relief='flat', bd=1, font=font(11), width=42,
+            anchor='w', indicatoron=True)
+        self.live_monitor_menu['menu'].configure(
+            bg=T.SURFACE_2, fg=T.TEXT, activebackground=T.ACCENT,
+            activeforeground=T.TEXT, font=font(11), tearoff=0)
+        self.live_monitor_menu.pack(side='left', padx=(0, T.S2))
+        Button(picker, 'Monitore neu laden', self.refresh_live_monitors,
+               'secondary', icon='refresh', bg=T.SURFACE).pack(side='left')
+        self.monitor_note = tk.StringVar(
+            value='Die Vorschau wird nur auf diesem PC erstellt und nicht hochgeladen.')
+        tk.Label(source.body, textvariable=self.monitor_note, bg=T.SURFACE,
+                 fg=T.MUTE, font=font(11), wraplength=px(800),
+                 justify='left', anchor='w').pack(fill='x', pady=(0, T.S2))
+        Button(source.body, 'Vorschau aktualisieren', self.preview_live_monitor,
+               'secondary', icon='eye', bg=T.SURFACE).pack(anchor='w')
+        self.live_monitor_canvas = tk.Canvas(
+            source.body, width=px(530), height=px(307), bg=T.FIELD,
+            bd=0, highlightbackground=T.LINE, highlightthickness=1)
+        self.live_monitor_canvas.pack(anchor='w', pady=(T.S3, 0))
+        self.live_monitor_canvas.create_text(
+            px(265), px(153), text='Monitor auswählen und Vorschau anzeigen',
+            fill=T.MUTE, font=font(12))
+        self.refresh_live_monitors()
+
     # ---- match history -------------------------------------------------
     def build_history(self):
         page = self.page_body('history')
@@ -2473,6 +2514,8 @@ class Gui:
                bg=T.SURFACE).pack(side='left')
         Button(row, 'Alle Replays synchronisieren', self.sync_all, 'secondary',
                icon='refresh', bg=T.SURFACE).pack(side='left', padx=(px(6), 0))
+        Button(row, 'Replay-Diagnose', self.show_replay_diagnostics, 'secondary',
+               icon='film', bg=T.SURFACE).pack(side='left', padx=(px(6), 0))
         self.settings_note = tk.StringVar(
             value='Zugangsdaten bleiben auf diesem PC in %APPDATA%\\SquadLootClient.')
         tk.Label(actions.body, textvariable=self.settings_note, bg=T.SURFACE, fg=T.MUTE,
@@ -2850,10 +2893,13 @@ class Gui:
         threading.Thread(target=runner, daemon=True).start()
 
     def sync_all(self):
-        self.set_status('Synchronisiere alle Replay-Daten …', T.DIM)
-        self.job(lambda: str(self.core.sync_matches(self.core.credentials(),
-                                                    max_items=100000))
-                 + ' Matches synchronisiert')
+        self.set_status('Prüfe und übertrage alle Replay-Daten erneut …', T.DIM)
+        self.job(lambda: str(self.core.replay_sync_all(force=True))
+                 + ' Replay-Matches erneut zum Pi übertragen')
+
+    def show_replay_diagnostics(self):
+        messagebox.showinfo('SquadLoot · Replay-Diagnose',
+                            self.core.replay_diagnostics())
 
     def start_round(self):
         if messagebox.askyesno('Neue Runde',
@@ -2865,11 +2911,8 @@ class Gui:
         self.set_status('Replays werden lokal ausgewertet …', T.DIM)
 
         def run():
-            engine = self.core.replay_engine
-            if not engine.scan_once(force=True) and engine.error:
-                raise RuntimeError(engine.error)
-            count = self.core.sync_matches(self.core.credentials(), max_items=100000)
-            return f'{count} Replay-Matches synchronisiert'
+            count = self.core.replay_sync_all(force=True)
+            return f'{count} Replay-Matches erneut zum Pi übertragen'
 
         self.job(run)
 
@@ -2906,6 +2949,89 @@ class Gui:
         except (OSError, ValueError, RuntimeError) as exc:
             self.live_state.set('Fehler', T.BAD, T.TINT_BAD)
             self.live_info.set(str(exc)[:240])
+
+    # ---- per-PC live monitor and local-only preview --------------------
+    def refresh_live_monitors(self):
+        try:
+            monitors = list_capture_monitors()
+        except (OSError, ValueError) as exc:
+            monitors = []
+            self.monitor_note.set(f'Bildschirme konnten nicht gelesen werden: {exc}')
+        choices = [('Automatisch · Fortnite-Fenster suchen', 'auto')]
+        for idx, (x, y, width, height) in enumerate(monitors, 1):
+            choices.append((f'Monitor {idx} · {width} × {height} (x={x}, y={y})', idx))
+        configured = self.core.config.get('live_monitor', 'auto')
+        if str(configured) != 'auto':
+            try:
+                configured = int(configured)
+            except (ValueError, TypeError):
+                configured = 'auto'
+        if configured != 'auto' and not (1 <= configured <= len(monitors)):
+            choices.append((f'Monitor {configured} · momentan nicht verbunden', configured))
+        self.live_monitor_values = dict(choices)
+        menu = self.live_monitor_menu['menu']
+        menu.delete(0, 'end')
+        for title, _ in choices:
+            menu.add_command(label=title, command=lambda text=title:
+                             self._choose_live_monitor(text))
+        label = next((title for title, value in choices if value == configured),
+                     choices[0][0])
+        self.live_monitor_var.set(label)
+        if not monitors and os.name == 'nt':
+            self.monitor_note.set('Keine Monitore gefunden. Prüfe die Windows-Anzeigeeinstellungen.')
+        elif monitors:
+            self.monitor_note.set(
+                f'{len(monitors)} Bildschirm(e) erkannt. Bei euch: Monitor 2 wählen, '
+                'wenn Fortnite auf Bildschirm 2 läuft. Die Vorschau bleibt lokal.')
+
+    def _choose_live_monitor(self, label):
+        self.live_monitor_var.set(label)
+        monitor = self.live_monitor_values.get(label, 'auto')
+        self.core.set_config({'live_monitor': monitor})
+        self.preview_live_monitor()
+
+    def preview_live_monitor(self):
+        monitor = self.live_monitor_values.get(self.live_monitor_var.get(), 'auto')
+        if monitor == 'auto':
+            monitor = detect_fortnite_monitor()
+        try:
+            monitor = int(monitor)
+        except (TypeError, ValueError):
+            monitor = 1
+        self.monitor_preview_seq += 1
+        sequence = self.monitor_preview_seq
+        self.monitor_note.set(
+            f'Erstelle lokale Vorschau von Monitor {monitor} …'
+            + (' Live-Test neu starten, falls er bereits läuft.'
+               if self.live_engine.running else ''))
+        def job():
+            try:
+                data = capture_monitor_preview(monitor)
+                self.events.put(('monitor_preview', (sequence, monitor, data)))
+            except Exception as exc:
+                self.events.put(('monitor_preview_error',
+                                 (sequence, str(exc)[:200])))
+        threading.Thread(target=job, daemon=True,
+                         name='SquadLootMonitorPreview').start()
+
+    def _show_live_monitor_preview(self, sequence, monitor, ppm):
+        if sequence != self.monitor_preview_seq:
+            return
+        try:
+            self.monitor_preview_image = tk.PhotoImage(
+                data=ppm, format='PPM')
+            canvas = self.live_monitor_canvas
+            canvas.delete('all')
+            canvas.create_image(
+                px(265), px(153), anchor='center', image=self.monitor_preview_image)
+            self.monitor_note.set(
+                f'Monitor {monitor} · Momentaufnahme, nur lokal. '
+                + ('Live-Test neu starten, um die neue Quelle zu übernehmen.'
+                   if self.live_engine.running else
+                   'Du kannst jetzt Live-Test starten.'))
+        except (tk.TclError, ValueError) as exc:
+            self.monitor_note.set('Vorschau konnte nicht dargestellt werden: '
+                                  + str(exc)[:150])
 
     # ---- in-game HUD ---------------------------------------------------
     def toggle_overlay(self):
@@ -3093,7 +3219,8 @@ class Gui:
         if running:
             self.live_state.set('Live aktiv', T.WARN, T.TINT_WARN)
             self.live_info.set(engine.state +
-                               (f' · {engine.certain} sicher erkannt' if engine.count else ''))
+                               (f' · {engine.certain} sicher erkannt' if engine.count else '') +
+                               (f' · Hinweis: {engine.warning[:100]}' if engine.warning else ''))
         elif engine.error:
             self.live_state.set('Fehler', T.BAD, T.TINT_BAD)
             self.live_info.set(engine.error)
@@ -3143,7 +3270,13 @@ class Gui:
 
     def handle_events(self, events):
         for kind, message in events:
-            if kind == 'error':
+            if kind == 'monitor_preview':
+                self._show_live_monitor_preview(*message)
+            elif kind == 'monitor_preview_error':
+                sequence, detail = message
+                if sequence == self.monitor_preview_seq:
+                    self.monitor_note.set('Vorschau fehlgeschlagen: ' + detail)
+            elif kind == 'error':
                 self.set_status('Fehler: ' + message[:220], T.BAD)
             elif kind == 'info':
                 self.set_status(message, T.OK)

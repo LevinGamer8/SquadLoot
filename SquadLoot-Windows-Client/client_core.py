@@ -12,7 +12,7 @@ import urllib.request
 from pathlib import Path
 from urllib.parse import urlsplit
 from replay_reader import load_matches, fingerprint
-from vision import ManagedReplayEngine
+from vision import ManagedReplayEngine, managed_replay_data_file
 
 APPDIR=Path(os.getenv('APPDATA') or str(Path.home()))/'SquadLootClient'
 CONFIG=APPDIR/'config.json'
@@ -119,7 +119,12 @@ class Api:
             payload=None
         try:
             with urllib.request.urlopen(request,data=payload,timeout=timeout) as r:
-                return json.load(r)
+                try:
+                    return json.load(r)
+                except (ValueError,UnicodeError) as exc:
+                    raise RuntimeError(
+                        f'{path}: Ungültige Server-Antwort (kein JSON; Cloudflare Access/WAF prüfen).'
+                    ) from exc
         except urllib.error.HTTPError as err:
             # Report the path and response format: for example /api/match may be
             # blocked by a WAF even when /api/state works. Never print credentials.
@@ -134,6 +139,8 @@ class Api:
             location=f' - CF-Ray {ray[:80]}' if ray else ''
             message=f'{path}: HTTP {err.code} [{kind}]{location}'
             if desc: message+=f': {str(desc)[:250]}'
+            if err.code==403 and path=='/api/match':
+                message+=' – Cloudflare Access/WAF: POST /api/match prüfen'
             raise RuntimeError(message) from err
         except urllib.error.URLError as err:
             raise RuntimeError(f'Verbindung fehlgeschlagen: {err.reason}') from err
@@ -168,6 +175,7 @@ class Core:
         self.state.setdefault('sent',{})
         self.state.setdefault('replay_rounds',{})
         self.lock=threading.RLock()
+        self.sync_lock=threading.RLock()   # GUI and poller must not upload/overwrite state concurrently
         self.round_id=None
         self.local_replay=None
         self.manual=0;self.vision=0;self.ammo=0;self.food=0;self.destroyed=0
@@ -178,6 +186,7 @@ class Core:
         self.last_state=0.0
         self.last_live=0.0
         self.last_replay_scan=0.0
+        self.last_sync_error=''
         self.connected=False
         self.stop=threading.Event()
         self.vision_worker=None
@@ -235,25 +244,89 @@ class Core:
             save_json(STATE,self.state)
             self.set_status('Replay erkannt – Squad-Runde #'+str(self.round_id))
 
-    def sync_matches(self,api,max_items=1000):
-        rows=load_matches(self.config.get('data_json',str(CHESTCOUNTER)),self.config['client_id'])
+    def sync_matches(self,api,max_items=1000,force=False):
+        """Serialize manual and automatic uploads; retry only unacknowledged rows."""
+        with self.sync_lock:
+            return self._sync_matches(api,max_items=max_items,force=force)
+
+    def _sync_matches(self,api,max_items=1000,force=False):
+        """Send new/changed matches, or resend existing rows to repair Pi history.
+
+        Only acknowledge a row after the server accepted it; unchanged rows
+        remain idempotent thanks to the server's (client_id,session_id) upsert.
+        """
+        rows=load_matches(managed_replay_data_file(self.config),self.config['client_id'])
         count=0
+        self.last_sync_error=''
         for item in sorted(rows,key=lambda m:m.get('started','')):
             key=item['session_id']
             rid=self.state['replay_rounds'].get(item['replay_file'])
-            # A round_id is local context, not part of the durable match fingerprint.
             h=fingerprint(item)
-            if self.state['sent'].get(key)==h:
+            if not force and self.state['sent'].get(key)==h:
                 continue
             if rid:
                 item['round_id']=rid
-            api.call('/api/match',item)
+            try:
+                response=api.call('/api/match',item)
+                if not isinstance(response,dict) or response.get('ok') is not True:
+                    raise RuntimeError('Server hat den Replay-Upload nicht bestätigt')
+            except Exception as exc:
+                self.last_sync_error=str(exc)[:200]
+                # Do not mark this row as sent: retry it on the next poll.
+                raise
             self.state['sent'][key]=h
             save_json(STATE,self.state)
             count+=1
             if count>=max_items:
                 break
         return count
+
+    def replay_sync_all(self,force=False):
+        """Explicit replay action: check local analysis and upload in one worker."""
+        if not self.replay_engine.scan_once(force=True):
+            if self.replay_engine.error:
+                raise RuntimeError(self.replay_engine.error)
+        count=self.sync_matches(self.credentials(),max_items=100000,force=force)
+        return count
+
+    def replay_diagnostics(self):
+        """Safe, local operational summary; never include API secrets."""
+        folder=Path(self.config.get('replay_dir') or str(REPLAYDIR))
+        datafile=managed_replay_data_file(self.config)
+        try:
+            replay_files=list(folder.glob('*.replay')) if folder.is_dir() else []
+        except OSError:
+            replay_files=[]
+        try:
+            analysed=load_matches(datafile,self.config['client_id'])
+            parsed_error=''
+        except (OSError,ValueError,TypeError) as exc:
+            analysed=[]
+            parsed_error=str(exc)[:170]
+        sent=set(self.state.get('sent',{}))
+        ready=sum(1 for m in analysed if m['session_id'] in sent)
+        lines=[
+            f'Fortnite-Replay-Ordner: {folder}',
+            f'Replay-Dateien auf diesem PC: {len(replay_files)}',
+            f'Analyse-JSON: {datafile}',
+            f'Daten-Datei vorhanden: {"Ja" if datafile.is_file() else "Nein"}',
+            f'Auswertbare Matches in der JSON: {len(analysed)}',
+            f'Vom Client als hochgeladen markiert: {ready} von {len(analysed)}',
+            f'Letzte Replay-Analyse: {self.replay_engine.status}',
+        ]
+        if self.replay_engine.error:
+            lines.append('Replay-Fehler: '+self.replay_engine.error[:170])
+        if self.last_sync_error:
+            lines.append('Letzter Upload-Fehler: '+self.last_sync_error[:170])
+        if parsed_error:
+            lines.append('JSON-Lesefehler: '+parsed_error)
+        if not folder.is_dir():
+            lines.append('Hinweis: Fortnite-Replay-Ordner fehlt.')
+        if not datafile.is_file():
+            lines.append('Hinweis: Noch keine data.json der Replay-Engine vorhanden.')
+        return '\n'.join(lines)
+
+
 
     def send_live(self,api):
         with self.lock:
@@ -263,42 +336,55 @@ class Core:
         api.call('/api/live',data)
 
     def poll_once(self):
-        """Background tick. Can be called repeatedly; 2-10s based on task."""
+        """Keep live/polling active when an unrelated replay upload fails."""
         api=self.credentials()
         now=time.monotonic()
+        failures=[]
         if now-self.last_replay_scan>=2:
-            self.watch_new_replay(api)
+            try:
+                self.watch_new_replay(api)
+            except Exception as exc:
+                failures.append('Rundenzuordnung: '+str(exc)[:140])
             self.last_replay_scan=now
         if now-self.last_full_read>=8:
-            n=self.sync_matches(api,max_items=30)
+            try:
+                n=self.sync_matches(api,max_items=30)
+                if n:self.set_status(f'{n} neue/aktualisierte Replays übertragen')
+            except Exception as exc:
+                failures.append('Replay-Upload: '+str(exc)[:140])
             self.last_full_read=now
-            if n:self.set_status(f'{n} neue/aktualisierte Replays übertragen')
         if self.round_id and (now-self.last_live>=1.5 or now-self.last_push>=15):
-            self.send_live(api)
-            self.last_live=now
+            try:
+                self.send_live(api)
+                self.last_live=now
+            except Exception as exc:
+                failures.append('Live-Upload: '+str(exc)[:140])
         if now-self.last_state>=2:
-            state=api.call('/api/state')
-            with self.lock:
-                self.current_state=state
-                rid=(state.get('round') or {}).get('id')
-                # Someone on the squad pressed New Round: all clients join and reset.
-                if rid and self.round_id and rid>self.round_id:
-                    self.round_id=rid
-                    self.reset_local_counters()
-                if rid and not self.round_id:
-                    self.round_id=rid
-                self.last_state=now
-                self.connected=True
-                if self.status.startswith(('Fehler','Verbindung','Nicht verbunden')):
-                    self.status='Verbunden'
+            try:
+                state=api.call('/api/state')
+                with self.lock:
+                    self.current_state=state
+                    rid=(state.get('round') or {}).get('id')
+                    if rid and self.round_id and rid>self.round_id:
+                        self.round_id=rid
+                        self.reset_local_counters()
+                    if rid and not self.round_id:
+                        self.round_id=rid
+                    self.last_state=now
+                    self.connected=True
+            except Exception as exc:
+                failures.append('Statusabruf: '+str(exc)[:140])
+                self.connected=False
+        if failures:
+            self.set_status('Fehler: '+ ' | '.join(failures)[:165])
+        elif self.connected and self.status.startswith(('Fehler','Verbindung','Nicht verbunden')):
+            self.set_status('Verbunden')
         self.last_push=now
 
     def worker_loop(self):
         while not self.stop.is_set():
             try:
                 self.poll_once()
-                if self.status.startswith(('Fehler','Verbindung fehl')):
-                    self.set_status('Verbunden')
             except Exception as ex:
                 self.connected=False
                 self.set_status('Fehler: '+str(ex)[:170])
@@ -322,6 +408,6 @@ def sync_once(config):
     if not core.replay_engine.scan_once(force=True) and core.replay_engine.error:
         raise RuntimeError(core.replay_engine.error)
     api=core.credentials()
-    count=core.sync_matches(api,max_items=100000)
+    count=core.sync_matches(api,max_items=100000,force=True)
     state=api.call('/api/state')
     return count,state

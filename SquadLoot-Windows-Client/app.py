@@ -1131,9 +1131,14 @@ class Win32:
         if not Win32.available:
             return 0
         try:
-            hwnd = window.winfo_id()
-            parent = ctypes.windll.user32.GetParent(hwnd)
-            return parent or hwnd
+            # ctypes returns 32-bit int by default. HWND needs pointer-sized
+            # WinAPI signatures on 64-bit Windows (most gaming PCs).
+            import ctypes.wintypes as wintypes
+            hwnd = int(window.winfo_id())
+            fn = ctypes.windll.user32.GetParent
+            fn.argtypes = [wintypes.HWND]
+            fn.restype = wintypes.HWND
+            return int(fn(wintypes.HWND(hwnd)) or hwnd)
         except (AttributeError, OSError, tk.TclError):
             return 0
 
@@ -1146,9 +1151,16 @@ class Win32:
             return False
         try:
             user32 = ctypes.windll.user32
+            import ctypes.wintypes as wintypes
+            user32.GetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int]
+            user32.GetWindowLongW.restype = ctypes.c_long
+            user32.SetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int,
+                                              ctypes.c_long]
+            user32.SetWindowLongW.restype = ctypes.c_long
             style = user32.GetWindowLongW(hwnd, Win32.GWL_EXSTYLE)
-            style |= (Win32.WS_EX_LAYERED | Win32.WS_EX_TOOLWINDOW
-                      | Win32.WS_EX_NOACTIVATE)
+            # Leave WS_EX_LAYERED to Tk's '-alpha' implementation. Manually
+            # setting it can reset or conflict with Tk's transparency state.
+            style |= (Win32.WS_EX_TOOLWINDOW | Win32.WS_EX_NOACTIVATE)
             if click_through:
                 style |= Win32.WS_EX_TRANSPARENT
             else:
@@ -1164,12 +1176,30 @@ class Win32:
         if not hwnd:
             return False
         try:
-            ctypes.windll.user32.SetWindowPos(
+            import ctypes.wintypes as wintypes
+            user32 = ctypes.windll.user32
+            user32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND,
+                                           ctypes.c_int, ctypes.c_int,
+                                           ctypes.c_int, ctypes.c_int,
+                                           ctypes.c_uint]
+            user32.SetWindowPos.restype = wintypes.BOOL
+            return bool(user32.SetWindowPos(
                 hwnd, Win32.HWND_TOPMOST, 0, 0, 0, 0,
-                Win32.SWP_NOMOVE_NOSIZE_NOACTIVATE)
-            return True
+                Win32.SWP_NOMOVE_NOSIZE_NOACTIVATE))
         except (AttributeError, OSError):
             return False
+
+    @staticmethod
+    def primary_screen():
+        """Windows primary display always starts at virtual position 0,0."""
+        if not Win32.available:
+            return None
+        try:
+            get = ctypes.windll.user32.GetSystemMetrics
+            width, height = get(0), get(1)
+            return (0, 0, width, height) if width > 0 and height > 0 else None
+        except (AttributeError, OSError):
+            return None
 
     @staticmethod
     def virtual_screen():
@@ -1318,9 +1348,19 @@ class Hud:
         return 0, 0, width, height
 
     def default_position(self, width, height):
-        """Top left, clear of Fortnite's centre and of the recognition region."""
-        x, y, box_w, box_h = self.screen_box()
-        return x + max(self.u(24), int(box_w * 0.02)), y + max(self.u(90), int(box_h * 0.1))
+        """Start on the PRIMARY display, never on an offscreen side monitor."""
+        try:
+            primary = Win32.primary_screen()
+            if primary is None:
+                primary = (0, 0, self.master.winfo_screenwidth(),
+                           self.master.winfo_screenheight())
+        except tk.TclError:
+            primary = self.screen_box()
+        x, y, box_w, box_h = primary
+        margin_x = max(self.u(24), int(box_w * 0.02))
+        margin_y = max(self.u(90), int(box_h * 0.1))
+        return (x + min(margin_x, max(0, box_w - width)),
+                y + min(margin_y, max(0, box_h - height)))
 
     def clamp(self, x, y, width, height):
         """Keep the card fully on a real monitor after a resolution change."""
@@ -1353,6 +1393,7 @@ class Hud:
     # ---- window lifecycle ----------------------------------------------
     def show(self):
         if self.win is not None:
+            self.bring_to_front()
             return
         win = tk.Toplevel(self.master)
         self.win = win
@@ -1362,16 +1403,16 @@ class Hud:
             win.overrideredirect(True)      # no title bar, no taskbar button
         except tk.TclError:
             pass
-        win.configure(bg=HUD_KEY)
+        # Reliability fallback for Windows: a solid card with soft opacity.
+        # '-transparentcolor' + '-alpha' + manual layered Win32 styles can
+        # combine into a completely invisible window on some Windows setups.
+        # Our HUD is only ~188x60px; prefer a visible card to invisible corners.
+        win.configure(bg=T.SURFACE)
         win.resizable(False, False)
-        for attribute, value in (('-topmost', True), ('-transparentcolor', HUD_KEY)):
-            try:
-                win.attributes(attribute, value)
-            except tk.TclError:
-                # X11 has no transparent colour key; the card simply keeps its
-                # own dark background there.
-                if attribute == '-transparentcolor':
-                    win.configure(bg=T.BG)
+        try:
+            win.attributes('-topmost', True)
+        except tk.TclError:
+            pass
         self.apply_opacity()
         self.canvas = tk.Canvas(win, bg=win.cget('bg'), bd=0, highlightthickness=0,
                                 takefocus=0)
@@ -1383,10 +1424,25 @@ class Hud:
         win.protocol('WM_DELETE_WINDOW', self.hide)
         self._signature = None
         self._size = (0, 0)
-        self.apply_click_through()
         self.redraw(force=True)
         win.deiconify()
-        Win32.raise_topmost(win)
+        win.update_idletasks()
+        # Apply native styles only AFTER the native wrapper was mapped.
+        self.bring_to_front()
+
+    def bring_to_front(self):
+        """Reassert visibility without activating or focusing Fortnite."""
+        if self.win is None:
+            return
+        try:
+            self.win.deiconify()
+            self.win.attributes('-topmost', True)
+            self.win.lift()
+            self.apply_opacity()
+            self.apply_click_through()
+            Win32.raise_topmost(self.win)
+        except tk.TclError:
+            pass
 
     def hide(self):
         if self.win is None:
@@ -1459,7 +1515,9 @@ class Hud:
             width, height = self._size
             x, y = self.default_position(width, height)
             self.win.geometry(f'+{x}+{y}')
-            self.store_position()
+            # Keep the saved coordinates null until the user deliberately drags
+            # the overlay. Reading winfo_x/y here can return the OLD position.
+            self.bring_to_front()
         self.on_change()
 
     def store_position(self):
@@ -2666,6 +2724,8 @@ class Gui:
                icon='refresh', bg=T.SURFACE).pack(side='left')
         Button(actions, 'Vorschau', self.preview_hud, 'ghost', icon='eye',
                bg=T.SURFACE).pack(side='left', padx=(px(6), 0))
+        Button(actions, 'HUD prüfen', self.diagnose_hud, 'ghost', icon='shield',
+               bg=T.SURFACE).pack(side='left', padx=(px(6), 0))
 
         divider(body)
         label(body, 'Globale Tastenkürzel (optional)', 12, 'bold', fg=T.DIM,
@@ -2690,11 +2750,41 @@ class Gui:
         self.sync_hud_controls()
 
     def preview_hud(self):
-        """Show the HUD briefly so the user can judge opacity and size."""
+        """Make a mapped HUD visible again; do not only repaint a hidden HWND."""
         if not self.hud.visible:
             self.hud.set_enabled(True)
         else:
             self.hud.redraw(force=True)
+            self.hud.bring_to_front()
+
+    def diagnose_hud(self):
+        """Diagnose window mapping without displaying credentials or filenames."""
+        self.preview_hud()
+        win = self.hud.win
+        if win is None:
+            messagebox.showwarning('HUD-Diagnose', 'Kein HUD-Fenster vorhanden.')
+            return
+        try:
+            self.root.update_idletasks()
+            width, height = self.hud._size
+            lines = [
+                'SquadLoot ' + current_version(),
+                'Fensterstatus: ' + str(win.state()),
+                'Windows/Tk sichtbar: ' + str(bool(win.winfo_viewable())),
+                'Gemappt: ' + str(bool(win.winfo_ismapped())),
+                'Position: ' + str(win.winfo_x()) + ', ' + str(win.winfo_y()),
+                'Groesse: ' + str(width) + ' x ' + str(height),
+                'Deckkraft: ' + str(win.attributes('-alpha')),
+                'Gesperrt: ' + str(bool(self.hud.opt('hud_locked'))),
+                'Hauptmonitor: ' + str(Win32.primary_screen()),
+                'Virtueller Bildschirm: ' + str(self.hud.screen_box()),
+                'Win32 HWND: ' + str(Win32.handle(win)),
+            ]
+            messagebox.showinfo('SquadLoot HUD-Diagnose', '\n'.join(lines),
+                                parent=self.root)
+        except tk.TclError as exc:
+            messagebox.showwarning('HUD-Diagnose',
+                                   'HUD-Fenster kann nicht abgefragt werden: ' + str(exc))
 
     def template_caption(self):
         path = self.core.config.get('vision_template', '')

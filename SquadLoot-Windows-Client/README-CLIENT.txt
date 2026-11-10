@@ -112,3 +112,16 @@ SQUADLOOT 1.5.0 - HUD + VISUELLER LIVE-TEST
 Der Test startet nie ungefragt und fuegt dem Windows-Paket keine weiteren
 Dateien hinzu. Die exakte Fortnite-Erkennung und Anti-Cheat-Vertraeglichkeit
 sind nicht offiziell garantiert. Bitte zuerst mit Video testen.
+
+
+SQUADLOOT 1.5.1 - HUD-SICHTBARKEITSFIX
+====================================
+
+Wenn das Mini-HUD trotz aktivem Schalter unsichtbar war, wurde der
+Windows-Tk-Fensterpfad ueberarbeitet. Das HUD oeffnet sich nun auf dem
+Hauptmonitor, und Vorschau kann das Fenster nach vorne holen.
+Unter Einstellungen -> In-Game-HUD -> HUD pruefen erscheint ein
+Fensterdiagnose-Dialog mit sichtbarem Status und Koordinaten (ohne Tokens).
+Auf einigen Systemen bleiben die Ecken voruebergehend rechteckig, damit
+das kleine HUD nicht durch transparente Fensterschichten verschwindet.
+Wenn es im Spiel nicht sichtbar ist, Windowed Fullscreen testen.

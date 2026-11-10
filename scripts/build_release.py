@@ -63,7 +63,7 @@ def build(version:str,repository:str,output:pathlib.Path):
         'client_version':version,'client_package_url':prefix+update_filename,
         'client_package_sha256':hashlib.sha256(update_data).hexdigest(),
         'client_package_size':len(update_data),
-        'notes':f'SquadLoot {version}: Claude UI/UX Redesign Windows und Web, persistentes Matcharchiv, CSV und original Fortnite-Bilder',
+        'notes':f'SquadLoot {version}: automatischer passiver Replay-Scan, ein Klick für Live-Tracking, verwaltete Laufzeiten, bestehendes Matcharchiv und CSV',
     }
     (output/'latest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     installer=ROOT/'SQUADLOOT_INSTALLIEREN.ps1'

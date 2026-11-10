@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.5.4 – Live-Tracking mit nur einem Button + automatische Replay-Auswertung
+
+- Vereinfachter Live-Tab: persönliche, Squad- und Replay-Zähler sowie
+  **Live-Test starten / stoppen**, ohne separate Bildvorlagen, Tasten,
+  OBS-Ordnerwahl, Fremdprogrammkonfiguration oder Kalibrierungsassistent.
+- Die bewährte Visual-Chest-Counter-Engine startet headless als intern
+  verwalteter Worker (JSON-Events), ohne zweites Bedienfenster.
+- Die bewährte Replay-Engine wird ebenfalls intern verwaltet und startet
+  nach stabilen/abgeschlossenen Replays automatisch. Der alte
+  ChestCounter.exe-Pfad ist nicht mehr erforderlich.
+- Erste Anwendung lädt die beiden originalen Release-Artefakte bei Bedarf
+  mit fest hinterlegten SHA256-Checksummen in den privaten
+  %LOCALAPPDATA%-Komponentenordner (38 MB Replay, 156 MB Live).
+- Update-Format, Pi, Cloudflare, SQLite/Matcharchiv, bestehende Tokens,
+  Replay-Protokoll und GitHub-Release-Pipeline bleiben kompatibel.
+- Bereits vorhandene deutsche Vorlagen aus v1.5.3 werden migriert;
+  neue deutsche Installationen bleiben bis zur Verifikation des
+  Original-Popup-Musters eingeschränkt. Keine fälschliche Vollgarantie.
+- Regressionstests für Pfadsicherheit, ZIP-Extraktion, JSON-Events,
+  Replay-Worker, Rundengrenzen und Update-Allowlist.
+- Keine Anti-Cheat-Freigabe; vor produktivem Windows/Fortnite-Einsatz
+  müssen Performance und Trefferquote praktisch überprüft werden.
+
+
 ## 1.5.3 – Deutsches Truhen-XP-Popup kalibrieren (Beta)
 
 - Einmalige, vollständig lokale Erstellung eines echten deutschen

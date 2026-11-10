@@ -4,6 +4,42 @@ SquadLoot hostet eure Fortnite-Truhenstatistiken lokal auf dem Raspberry Pi.
 Der Code ist als öffentliche Release-Quelle gedacht; **keine echten Zugangsdaten
 werden in Git gespeichert**.
 
+## SquadLoot v1.5.4 – Einfach Replay + ein Klick für Live
+
+Das Windows-Fenster hat im Bereich **Live-Tracking** nur noch die wichtigsten
+Zähler und **Live-Test starten / stoppen**. Es gibt keine separate
+OBS-Ordnerauswahl, Interaktionstaste oder PNG-Suchvorlage mehr.
+
+- **Passiv (Standard):** SquadLoot beobachtet Replays und wertet abgeschlossene
+  Dateien im Hintergrund aus – bei allen Squad-Mitgliedern, auch ohne manuell
+  eingetragene ChestCounter.exe. Bereits gespeicherte Matches bleiben erhalten.
+- **Live (optional):** Ein Klick lädt beim ersten Mal die geprüfte, interne
+  Laufzeit der visuellen Erkennung herunter und startet sie *ohne zweites GUI*.
+  Die Schätzwerte werden zum Pi synchronisiert und nach Matchende durch
+  Replay-Ergebnisse ergänzt beziehungsweise bestätigt.
+- **Updates wie bisher:** Die Windows- und Pi-Update-ZIPs bleiben klein,
+  denn die Analyse-Laufzeiten werden nur einmal in einem privaten,
+  separat verwalteten Programmordner installiert. Kein manuelles Einrichten
+  von Fremdprogrammen, kein zusätzliches Installationsfenster.
+
+**Ehrliche technische Grenze:** Für diese Version verwendet SquadLoot die
+ausgewerteten Open-Source-Engines weiterhin als **verwaltete Komponenten**.
+Der erste Replay-Scan benötigt einmalig einen Download von ca. 38 MB und
+der erste Live-Start ca. 156 MB vom jeweiligen Original-GitHub-Release.
+Die Dateien werden **SHA-256-verifiziert** und bleiben unter
+\`%LOCALAPPDATA%\SquadLoot\engines\`, nicht in der regulären Update-ZIP.
+Keine Binärdateien werden aus unbekannten Quellen nachgeladen.
+
+**Sprache:** Eine zuvor unter v1.5.3 erstellte eigene deutsche Truhen-XP-
+Bildvorlage wird automatisch migriert. Auf einem neuen PC ohne Vorlage ist
+Deutsch im visuellen Modus noch **nicht zuverlässig validiert**. Die
+Replay-Analyse ist dagegen nicht von der In-Game-Sprache abhängig.
+Echte deutsche XP-Popup-Bilder werden für die nächste zuverlässigere
+Vorlagenausgabe benötigt.
+
+[Kurze Testanleitung](docs/VISUAL-LIVE-TEST.md) ·
+[Quellen, Lizenzen und SHA-256](docs/THIRD_PARTY_COMPONENTS.md)
+
 ## SquadLoot v1.5.3: Deutsches Truhen-XP-Popup kalibrieren
 
 Der separat installierte Visual Chest Counter v0.2.3 unterstützt ab Werk nur

@@ -554,3 +554,487 @@ def restore_german_visual_template(obs_output):
     template.unlink(missing_ok=True)
     _shutil.rmtree(backup_dir)
     return str(root)
+
+
+# ---------------------------------------------------------------------------
+# SquadLoot v1.5.4: managed, headless analysis engines.
+#
+# The regular SquadLoot auto-update remains <4MB. The first Replay scan or
+# user-triggered Live start downloads pinned upstream binaries into a PRIVATE
+# app-data runtime, checks SHA256, and runs them WITHOUT their separate GUI.
+# No player installation, custom executable path or additional app window.
+#
+# Replay engine: MIT LED-N/Fortnite-ChestCounter v1.4.0, --once --data --demos.
+# Visual engine: MIT GabrielGzS/fortnite-visual-chest-counter v0.2.3,
+# embedded Python worker, live --gui (machine-readable JSON lines).
+# ---------------------------------------------------------------------------
+import hashlib as _hashlib
+import io as _io
+import json as _json
+import urllib.request as _urlrequest
+import urllib.parse as _urlparse
+import zipfile as _zipfile
+import stat as _stat
+import queue as _queue
+import subprocess as _subprocess2
+import tempfile as _tempfile2
+import shutil as _shutil2
+
+_MANAGED_ROOT = Path(os.environ.get('LOCALAPPDATA') or
+                     str(Path.home() / '.local' / 'share')) / 'SquadLoot' / 'engines'
+_REPLAY_NAME = 'ChestCounter-v1.4.0'
+_VISUAL_NAME = 'VisualCounter-v0.2.3'
+_REPLAY_URL = ('https://github.com/LED-N/Fortnite-ChestCounter/releases/'
+               'download/v1.4.0/ChestCounter.exe')
+_REPLAY_SHA256 = '9da628f09f8e1d8545ad7f34ecb65fee48acd856bcce8c809f1e0eb8a4e5c8c7'
+_REPLAY_BYTES = 37959310
+_VISUAL_URL = ('https://github.com/GabrielGzS/fortnite-visual-chest-counter/'
+               'releases/download/v0.2.3/Fortnite-Visual-Chest-Counter-v0.2.3.zip')
+_VISUAL_SHA256 = 'a8c54d53842f640121df6fcf6be331be2941469c80e7880aee6d37cfaafd7e3c'
+_VISUAL_BYTES = 155755927
+_ALLOWED_REDIRECT_HOSTS = frozenset({
+    'github.com', 'release-assets.githubusercontent.com',
+    'objects.githubusercontent.com', 'github-releases.githubusercontent.com'
+})
+
+
+def _safe_archive_member(name):
+    """Reject archive traversal and dangerous files before unpacking."""
+    if not isinstance(name, str) or '\\' in name or '\x00' in name:
+        raise ValueError('Komponenten-Archiv: ungültiger Dateiname.')
+    segments = name.split('/')
+    if (name.startswith('/') or any(part in ('', '.', '..') for part in segments)
+            or ':' in segments[0]):
+        raise ValueError('Komponenten-Archiv: unsicherer Pfad.')
+    return segments
+
+
+def _managed_fetch(url, expected_sha, expected_size, destination, progress=None):
+    """Pin a third-party binary to an exact, published SHA256 and expected size."""
+    if os.name != 'nt':
+        raise RuntimeError('Die verwalteten Analyse-Komponenten benötigen Windows 10/11.')
+    if _urlparse.urlsplit(url).scheme != 'https' or _urlparse.urlsplit(url).hostname != 'github.com':
+        raise RuntimeError('Komponenten-Download nur aus dem offiziellen GitHub-Release.')
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    h = _hashlib.sha256()
+    written = 0
+    try:
+        request = _urlrequest.Request(url, headers={'User-Agent': 'SquadLoot/1.5.4'})
+        with _urlrequest.urlopen(request, timeout=45) as response, open(destination, 'wb') as out:
+            final = _urlparse.urlsplit(response.geturl())
+            if final.scheme != 'https' or final.hostname not in _ALLOWED_REDIRECT_HOSTS:
+                raise RuntimeError('Komponenten-Download: unerwartete Weiterleitung.')
+            while True:
+                part = response.read(1024 * 1024)
+                if not part:
+                    break
+                written += len(part)
+                if written > expected_size:
+                    raise ValueError('Komponenten-Download ist unerwartet groß.')
+                h.update(part)
+                out.write(part)
+                if progress:
+                    progress(min(100, int(written * 100 / expected_size)))
+        if written != expected_size or h.hexdigest() != expected_sha:
+            raise ValueError('Download beschädigt oder SHA256-Prüfung fehlgeschlagen.')
+        return destination
+    except Exception:
+        destination.unlink(missing_ok=True)
+        raise
+
+
+class ManagedComponentStore:
+    """Background-installable private runtimes; no changes to updater's file list."""
+
+    def __init__(self, root=None):
+        self.root = Path(root) if root else _MANAGED_ROOT
+        self._lock = threading.RLock()
+
+    def replay_path(self):
+        return self.root / _REPLAY_NAME / 'ChestCounter.exe'
+
+    def visual_root(self):
+        return self.root / _VISUAL_NAME
+
+    def visual_python(self):
+        return self.visual_root() / 'runtime' / 'python' / 'python.exe'
+
+    def ensure_replay(self, progress=None):
+        target = self.replay_path()
+        if target.is_file() and target.stat().st_size == _REPLAY_BYTES:
+            with target.open('rb') as file:
+                digest = _hashlib.file_digest(file, 'sha256').hexdigest()
+            if digest == _REPLAY_SHA256:
+                return target
+        with self._lock:
+            if target.is_file() and target.stat().st_size == _REPLAY_BYTES:
+                with target.open('rb') as file:
+                    digest = _hashlib.file_digest(file, 'sha256').hexdigest()
+                if digest == _REPLAY_SHA256:
+                    return target
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with _tempfile2.TemporaryDirectory(prefix='.replay-download-', dir=target.parent) as tmp:
+                staged = Path(tmp) / 'ChestCounter.exe'
+                _managed_fetch(_REPLAY_URL, _REPLAY_SHA256, _REPLAY_BYTES, staged, progress)
+                os.replace(staged, target)
+        return target
+
+    @staticmethod
+    def unpack_visual_zip(archive, destination):
+        """Only runtime/ paths from the verified release; no DLL/EXE outside it."""
+        count = 0
+        total = 0
+        present = set()
+        with _zipfile.ZipFile(archive) as z:
+            for member in z.infolist():
+                if member.is_dir():
+                    continue
+                name = member.filename
+                parts = _safe_archive_member(name)
+                if parts[0] != 'runtime':
+                    continue
+                mode = (member.external_attr >> 16) & 0o170000
+                if mode not in (0, 0o100000):
+                    raise ValueError('Komponentenarchiv enthält unerlaubten Dateityp.')
+                if len(parts) < 3 or parts[1] not in ('python', 'lib', 'ffmpeg'):
+                    continue
+                if name in present:
+                    raise ValueError('Doppelte Datei im Komponentenarchiv.')
+                count += 1
+                total += member.file_size
+                if count > 12000 or member.file_size > 180_000_000 or total > 1_500_000_000:
+                    raise ValueError('Komponentenarchiv überschreitet Sicherheitsgrenzen.')
+                target = Path(destination).joinpath(*parts)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with z.open(member) as src, open(target, 'wb') as dst:
+                    _shutil2.copyfileobj(src, dst, 1024 * 1024)
+                present.add(name)
+        required = (
+            Path(destination) / 'runtime/python/python.exe',
+            Path(destination) / 'runtime/lib/fortnite_chest_counter/counter.py',
+            Path(destination) / 'runtime/ffmpeg/ffmpeg.exe',
+        )
+        if any(not p.is_file() for p in required):
+            raise ValueError('Bildanalyse-Komponente unvollständig: Python/Detector/FFmpeg fehlt.')
+
+    def ensure_visual(self, progress=None, previous_obs=None):
+        root = self.visual_root()
+        if self.visual_python().is_file() and (root / '.squadloot-sha256').is_file():
+            return root
+        with self._lock:
+            if self.visual_python().is_file() and (root / '.squadloot-sha256').is_file():
+                return root
+            self.root.mkdir(parents=True, exist_ok=True)
+            with _tempfile2.TemporaryDirectory(prefix='.visual-download-', dir=self.root) as tmp:
+                archive = Path(tmp) / 'visual.zip'
+                staging = Path(tmp) / 'files'
+                staging.mkdir()
+                _managed_fetch(_VISUAL_URL, _VISUAL_SHA256, _VISUAL_BYTES,
+                               archive, progress)
+                self.unpack_visual_zip(archive, staging)
+                (staging / '.squadloot-sha256').write_text(_VISUAL_SHA256, encoding='ascii')
+                if root.exists():
+                    # Only our own runtime folder is ever removed.
+                    _shutil2.rmtree(root)
+                os.replace(staging, root)
+            # Reuse an existing user's real German word template where available.
+            if previous_obs:
+                try:
+                    self.adopt_german_template(previous_obs)
+                except (OSError, ValueError):
+                    pass  # English detection is still available; no fake German claims.
+        return root
+
+    def adopt_german_template(self, previous_obs):
+        """Migrate an already user-calibrated DE template from 1.5.3 if valid."""
+        previous_obs = Path(previous_obs)
+        source = (previous_obs.parent / 'runtime' / 'lib' /
+                  'fortnite_chest_counter' / 'templates' / 'chest' / 'de' / 'truhe.npy')
+        if not source.is_file() or source.stat().st_size > 100_000:
+            return False
+        blob = source.read_bytes()
+        if blob[:8] != b'\x93NUMPY\x01\x00':
+            return False
+        # Numpy's data header is deliberately parsed, never executed.
+        import ast
+        hl = _struct.unpack('<H', blob[8:10])[0]
+        header = ast.literal_eval(blob[10:10 + hl].decode('latin1').strip())
+        shape = header.get('shape')
+        if (header.get('descr') != '<f4' or len(shape) != 2 or
+                not (4 <= shape[0] <= 25 and 6 <= shape[1] <= 100) or
+                len(blob) != 10 + hl + 4 * shape[0] * shape[1]):
+            return False
+        floats = _struct.unpack('<%df' % (shape[0] * shape[1]), blob[10 + hl:])
+        if any(v not in (0.0, 1.0) for v in floats):
+            return False
+        matrix = [list(floats[i * shape[1]:(i + 1) * shape[1]])
+                  for i in range(shape[0])]
+        obs = self.visual_root() / 'obs_output'
+        obs.mkdir(parents=True, exist_ok=True)
+        install_german_visual_template(obs, matrix)
+        return True
+
+    def german_available(self):
+        return (self.visual_root() / 'runtime/lib/fortnite_chest_counter/'
+                'templates/chest/de/truhe.npy').is_file()
+
+
+class ManagedReplayEngine:
+    """Passive local replay analyzer; starts automatically, even without connection."""
+
+    def __init__(self, core, store=None):
+        self.core = core
+        self.store = store or ManagedComponentStore()
+        self.thread = None
+        self._busy = threading.RLock()
+        self.last_sig = None
+        self.last_attempt = 0.0
+        self.status = 'Replays werden automatisch ausgewertet'
+        self.error = ''
+        self.finished = 0
+
+    def _signature(self):
+        directory = Path(self.core.config.get('replay_dir', ''))
+        if not directory.is_dir():
+            return None
+        files = []
+        for path in directory.glob('*.replay'):
+            try:
+                st = path.stat()
+                files.append((st.st_mtime_ns, path.name, st.st_size))
+            except OSError:
+                pass
+        if not files:
+            return None
+        files.sort(reverse=True)
+        return tuple(files[:100])
+
+    def scan_once(self, force=False):
+        """Run at most one CLI analyzer concurrently; never block GUI thread."""
+        if not self._busy.acquire(blocking=False):
+            return False
+        try:
+            signature = self._signature()
+            if not signature:
+                self.status = 'Warte auf aufgezeichnete Fortnite-Replays'
+                return False
+            now = time.monotonic()
+            latest_age = time.time() - signature[0][0] / 1e9
+            if not force and (signature == self.last_sig or
+                              latest_age < 12 or now - self.last_attempt < 25):
+                return False
+            self.last_attempt = now
+            self.status = 'Replay-Analyse wird vorbereitet'
+            exe = self.store.ensure_replay()
+            datafile = Path(self.core.config.get('data_json') or
+                            str(Path(os.getenv('APPDATA') or Path.home()) /
+                                'ChestCounter' / 'data.json'))
+            datafile.parent.mkdir(parents=True, exist_ok=True)
+            cmd = [str(exe), '--once', '--data', str(datafile.parent),
+                   '--demos', str(self.core.config.get('replay_dir')), '--lang', 'en']
+            flags = getattr(_subprocess2, 'CREATE_NO_WINDOW', 0) if os.name == 'nt' else 0
+            result = _subprocess2.run(cmd, stdout=_subprocess2.PIPE,
+                                     stderr=_subprocess2.PIPE, timeout=240,
+                                     creationflags=flags)
+            if result.returncode != 0:
+                hint = result.stderr.decode('utf-8', 'replace')[-180:]
+                raise RuntimeError(f'Replay-Analyse Exit {result.returncode}: {hint}')
+            self.last_sig = signature
+            self.finished += 1
+            self.error = ''
+            self.status = 'Replays ausgewertet – Synchronisierung läuft'
+            return True
+        except Exception as exc:
+            self.error = str(exc)[:240]
+            self.status = 'Replay-Analyse: ' + self.error
+            return False
+        finally:
+            self._busy.release()
+
+    def loop(self):
+        # First pass after startup; subsequent new replay files are picked up.
+        while not self.core.stop.is_set():
+            self.scan_once()
+            self.core.stop.wait(10)
+
+    def start(self):
+        if os.name != 'nt':
+            return
+        if not self.thread or not self.thread.is_alive():
+            self.thread = threading.Thread(target=self.loop, daemon=True,
+                                           name='SquadLootReplayAnalyzer')
+            self.thread.start()
+
+
+class ManagedLiveEngine:
+    """One button controls a private, headless visual detector subprocess."""
+
+    def __init__(self, core, store=None):
+        self.core = core
+        self.store = store or ManagedComponentStore()
+        self._stop = threading.Event()
+        self.thread = None
+        self.process = None
+        self.state = 'Aus'
+        self.error = ''
+        self.started = False
+        self.count = 0
+        self.certain = 0
+        self.last_raw = 0
+        self.round_id = None
+        self.last_event_at = None
+        self._lock = threading.RLock()
+        self.legacy_obs = core.config.get('visual_counter_dir', '')
+
+    @property
+    def running(self):
+        return self.state not in ('Aus', 'Fehler', 'Beendet')
+
+    def feed_message(self, event):
+        """Pure counter policy: APPROX includes CERTAIN, never double-count."""
+        if not isinstance(event, dict) or event.get('type') not in ('counts', 'event'):
+            return False
+        if event.get('type') == 'event' and event.get('verdict') == 'rejected':
+            return False
+        approx = event.get('approx')
+        certain = event.get('certain', 0)
+        if type(approx) is not int or type(certain) is not int:
+            return False
+        if not (0 <= certain <= approx <= 1000000):
+            return False
+        with self._lock, self.core.lock:
+            if self.round_id != self.core.round_id:
+                self.round_id = self.core.round_id
+                self.last_raw = approx
+                self.count = self.certain = 0
+                self.core.vision = 0
+                self.core.last_live = 0.0
+                return False
+            if approx < self.last_raw:
+                self.last_raw = approx  # external reset, never subtract counted chests
+                return False
+            delta = approx - self.last_raw
+            self.last_raw = approx
+            if delta:
+                self.count += delta
+                self.core.vision = self.count
+                self.core.last_live = 0.0
+                self.last_event_at = time.monotonic()
+            self.certain = max(self.certain, certain)
+            return bool(delta)
+
+    def start(self):
+        if self.running:
+            return
+        if os.name != 'nt':
+            raise RuntimeError('Live-Bildanalyse benötigt Windows.')
+        self._stop.clear()
+        self.state = 'Einrichtung'
+        self.error = ''
+        self.count = self.certain = self.last_raw = 0
+        self.round_id = self.core.round_id
+        with self.core.lock:
+            self.core.vision = 0
+            self.core.last_live = 0.0
+        self.thread = threading.Thread(target=self._run, daemon=True,
+                                       name='SquadLootManagedLive')
+        self.thread.start()
+
+    def _run(self):
+        try:
+            def progress(value):
+                self.state = 'Live-Modul wird eingerichtet · %d %%' % value
+            root = self.store.ensure_visual(progress=progress,
+                                            previous_obs=self.legacy_obs)
+            if self._stop.is_set():
+                return
+            # A previously calibrated German template is automatically reused.
+            languages = '["de"]' if self.store.german_available() else '["en", "pt"]'
+            config = root / 'squadloot-live.toml'
+            config.write_text(
+                '[detector]\n'
+                'languages = ' + languages + '\n'
+                'process_fps = 15\n'
+                '[logging]\n'
+                'enabled = false\n'
+                '[capture]\n'
+                'mode = "off"\n', encoding='utf-8')
+            python = self.store.visual_python()
+            env = os.environ.copy()
+            env['PATH'] = (str(root / 'runtime' / 'ffmpeg') + os.pathsep +
+                           env.get('PATH', ''))
+            env['PYTHONUNBUFFERED'] = '1'
+            flags = getattr(_subprocess2, 'CREATE_NO_WINDOW', 0) if os.name == 'nt' else 0
+            cmd = [str(python), '-m', 'fortnite_chest_counter',
+                   'live', '--config', str(config),
+                   '--source', 'desktop', '--monitor', str(max(1, min(8,
+                       int(self.core.config.get('live_monitor', 1) or 1)))),
+                   '--gui', '--reset',
+                   '--state', str(root / 'state' / 'squadloot-live.json'),
+                   '--obs-dir', str(root / 'obs_output')]
+            self.state = 'Bildanalyse startet'
+            self.process = _subprocess2.Popen(
+                cmd, stdin=_subprocess2.PIPE, stdout=_subprocess2.PIPE,
+                stderr=_subprocess2.DEVNULL, cwd=str(root), env=env,
+                creationflags=flags)
+            self.started = True
+            self.state = ('Live-Tracking aktiv · Deutsch (Beta)'
+                          if self.store.german_available() else
+                          'Live-Tracking aktiv · XP-Popup/Objekterkennung')
+            for raw in self.process.stdout:
+                if self._stop.is_set():
+                    break
+                if len(raw) > 20000:
+                    continue
+                try:
+                    event = _json.loads(raw.decode('utf-8', 'replace'))
+                except ValueError:
+                    continue
+                if event.get('type') in ('event', 'counts'):
+                    self.feed_message(event)
+                elif event.get('type') == 'error':
+                    self.error = str(event.get('text', ''))[:200]
+                    self.state = 'Erkennungsfehler'
+                elif event.get('type') == 'connected':
+                    self.state = 'Live-Tracking aktiv'
+            exit_code = self.process.wait(timeout=10)
+            if not self._stop.is_set():
+                if exit_code:
+                    raise RuntimeError('Bildanalyse wurde beendet (Code %s).' % exit_code)
+                self.state = 'Beendet'
+        except Exception as exc:
+            self.error = str(exc)[:240]
+            self.state = 'Fehler'
+        finally:
+            if self.process is not None and self.process.poll() is None:
+                try:
+                    self.process.terminate()
+                    self.process.wait(timeout=3)
+                except (OSError, _subprocess2.TimeoutExpired):
+                    try:
+                        self.process.kill()
+                    except OSError:
+                        pass
+            self.process = None
+            self.started = False
+            if self._stop.is_set():
+                self.state = 'Aus'
+
+    def reset_counts(self):
+        """Reset SquadLoot's provisional totals, not the external process."""
+        with self._lock, self.core.lock:
+            self.count = self.certain = 0
+            self.core.vision = 0
+            self.core.last_live = 0.0
+
+    def stop(self):
+        self._stop.set()
+        p = self.process
+        if p and p.poll() is None:
+            try:
+                p.stdin.write(b'stop\n')
+                p.stdin.flush()
+            except (BrokenPipeError, OSError):
+                pass
+        self.state = 'Aus'

@@ -155,3 +155,25 @@ die Originaldateien des externen Programms und ist rueckgaengig machbar.
 Nach Updates des externen Counters muss die Kompatibilitaet neu geprueft
 werden. Der deutsche Modus ist noch nicht mit echten Matches validiert.
 Mehr in docs/VISUAL-LIVE-TEST.md auf GitHub.
+
+
+SQUADLOOT 1.5.4 – EIN KNOPF FÜR LIVE + AUTOMATISCHE REPLAYS
+==========================================================
+Keine fremde Anwendung und keine ChestCounter.exe manuell installieren:
+SquadLoot lädt bei Bedarf im Hintergrund die unveränderten, SHA-256-
+geprüften Analyse-Laufzeiten der beiden MIT-Projekte in
+%LOCALAPPDATA%\SquadLoot\engines.
+Replay (passiv): ca. 38 MB beim ersten Analysevorgang;
+Live: ca. 156 MB beim ersten Klick auf "Live-Test starten".
+Diese Komponenten sind KEIN Teil des 4-MB-SquadLoot-Updatepakets.
+
+Die Replay-Analyse läuft automatisch, auch wenn Live ausgeschaltet ist.
+Unter Live-Tracking gibt es nur noch Zähler und Start/Stopp.
+Die alte PNG/Tasten-Erkennung, OBS-Ordnerauswahl und der manuelle
+ChestCounter.exe-Pfad werden nicht mehr als Optionen angezeigt.
+Alle Zugangsdaten und bereits ausgewerteten Replays bleiben erhalten.
+
+Einschränkung: Eine unter v1.5.3 kalibrierte deutsche Popup-Vorlage
+wird übernommen. Neue deutsche Bildvorlagen sind noch nicht validiert;
+die Replay-Auswertung arbeitet unabhängig von der Fortnite-Sprache.
+Bei Problemen: docs/VISUAL-LIVE-TEST.md auf GitHub.

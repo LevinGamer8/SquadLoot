@@ -63,4 +63,4 @@ jobs:
           fi
           gh release create "$TAG" dist/*.zip dist/latest.json dist/SQUADLOOT_INSTALLIEREN.* \
             --target "$GITHUB_SHA" --latest --title "SquadLoot $TAG" \
-            --notes "SquadLoot $TAG: Full match history, CSV export and Fortnite loot visuals. Live screen detection remains experimental. No existing match data are intentionally removed."
+            --notes "SquadLoot $TAG: Automatic passive Replay analysis and one-click optional live tracking with headless, SHA256-pinned analysis runtimes. Existing match data are preserved. German live recognition needs a verified template on new PCs; Windows/Fortnite validation remains pending."

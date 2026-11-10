@@ -128,6 +128,7 @@ class TestManagedLiveWorker(unittest.TestCase):
                 config={'live_monitor': 2}, lock=threading.RLock(),
                 vision=0, last_live=0, round_id=2)
             class Store:
+                def install_loot_popup(self): return True
                 def ensure_visual(self, **kwargs):
                     return root
                 def visual_python(self):
@@ -161,6 +162,7 @@ class TestManagedLiveWorker(unittest.TestCase):
                 config={'live_monitor': 'auto'}, lock=threading.RLock(),
                 vision=0, last_live=0, round_id=2)
             class Store:
+                def install_loot_popup(self): return True
                 def ensure_visual(self, **kwargs):
                     return root
                 def visual_python(self):
@@ -226,6 +228,7 @@ class TestExpandedLive(unittest.TestCase):
                 'live_monitor':2,'live_diagnostics':False}, lock=threading.RLock(),
                 live_wake=threading.Event(), vision=0, last_live=0, round_id=2)
             class Store:
+                def install_loot_popup(self): return True
                 def ensure_visual(self, **kw): return root
                 def tune_visual_capture(self): return True
                 def german_available(self): return False
@@ -258,6 +261,7 @@ class TestExpandedLive(unittest.TestCase):
             core=SimpleNamespace(config={'live_language':'de','live_monitor':2},
                   lock=threading.RLock(), vision=0,last_live=0,round_id=1)
             class Store:
+                def install_loot_popup(self): return True
                 def ensure_visual(self, **kw): return Path(tmp)
                 def tune_visual_capture(self): return True
                 def german_available(self): return False

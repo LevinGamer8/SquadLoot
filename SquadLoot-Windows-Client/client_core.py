@@ -12,7 +12,7 @@ import urllib.request
 from pathlib import Path
 from urllib.parse import urlsplit
 from replay_reader import load_matches, fingerprint
-from vision import ManagedReplayEngine
+from vision import ManagedReplayEngine, managed_replay_data_file
 
 APPDIR=Path(os.getenv('APPDATA') or str(Path.home()))/'SquadLootClient'
 CONFIG=APPDIR/'config.json'
@@ -255,7 +255,7 @@ class Core:
         Only acknowledge a row after the server accepted it; unchanged rows
         remain idempotent thanks to the server's (client_id,session_id) upsert.
         """
-        rows=load_matches(self.config.get('data_json',str(CHESTCOUNTER)),self.config['client_id'])
+        rows=load_matches(managed_replay_data_file(self.config),self.config['client_id'])
         count=0
         self.last_sync_error=''
         for item in sorted(rows,key=lambda m:m.get('started','')):
@@ -292,7 +292,7 @@ class Core:
     def replay_diagnostics(self):
         """Safe, local operational summary; never include API secrets."""
         folder=Path(self.config.get('replay_dir') or str(REPLAYDIR))
-        datafile=Path(self.config.get('data_json') or str(CHESTCOUNTER))
+        datafile=managed_replay_data_file(self.config)
         try:
             replay_files=list(folder.glob('*.replay')) if folder.is_dir() else []
         except OSError:

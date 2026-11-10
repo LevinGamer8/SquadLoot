@@ -87,3 +87,20 @@ jobs:
               assert test.returncode == 0, ('Live worker failed', test.stderr[-1000:])
               print('Visual headless runtime verified', test.stdout.strip())
           PY
+      - name: Windows monitor detection and GDI preview smoke test
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, 'SquadLoot-Windows-Client')
+          from vision import list_capture_monitors, capture_monitor_preview
+          displays = list_capture_monitors()
+          print('Enumerated Win32 displays:', displays)
+          if displays:
+              data = capture_monitor_preview(1, max_width=320, max_height=180)
+              assert data.startswith(b'P6\n'), data[:40]
+              assert len(data) > 200, len(data)
+              print('GDI snapshot produced', len(data), 'local-only PPM bytes')
+          else:
+              print('No interactive desktop on CI runner; real preview must be checked on Windows.')
+          PY

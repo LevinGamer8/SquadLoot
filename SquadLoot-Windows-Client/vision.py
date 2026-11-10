@@ -598,6 +598,16 @@ _ALLOWED_REDIRECT_HOSTS = frozenset({
 })
 
 
+def managed_replay_data_file(config):
+    """ChestCounter --data always writes <folder>/data.json, never a custom basename."""
+    configured = config.get('data_json') or str(
+        Path(os.getenv('APPDATA') or Path.home()) / 'ChestCounter' / 'data.json')
+    path = Path(configured)
+    if path.is_dir():
+        return path / 'data.json'
+    return path if path.name.lower() == 'data.json' else path.parent / 'data.json'
+
+
 def _safe_archive_member(name):
     """Reject archive traversal and dangerous files before unpacking."""
     if not isinstance(name, str) or '\\' in name or '\x00' in name:
@@ -842,9 +852,7 @@ class ManagedReplayEngine:
             self.last_attempt = now
             self.status = 'Replay-Analyse wird vorbereitet'
             exe = self.store.ensure_replay()
-            datafile = Path(self.core.config.get('data_json') or
-                            str(Path(os.getenv('APPDATA') or Path.home()) /
-                                'ChestCounter' / 'data.json'))
+            datafile = managed_replay_data_file(self.core.config)
             datafile.parent.mkdir(parents=True, exist_ok=True)
             cmd = [str(exe), '--once', '--data', str(datafile.parent),
                    '--demos', str(self.core.config.get('replay_dir')), '--lang', 'en']
@@ -862,10 +870,16 @@ class ManagedReplayEngine:
                    ('already open', 'déjà ouvert', 'ya está abierto')):
                 raise RuntimeError('ChestCounter ist bereits geöffnet. '
                                    'Schließe die alte Instanz und versuche es erneut.')
+            unreadable = any(text in output for text in
+                ('cannot read this replay', 'unreadable replay',
+                 'replay(s) illisible', 'no se puede leer esta repetición'))
             self.last_sig = signature
             self.finished += 1
-            self.error = ''
-            self.status = ('Replay-Scan abgeschlossen – Synchronisierung läuft'
+            self.error = ('Ein oder mehrere Replays waren nicht lesbar. '
+                          '%APPDATA%\\ChestCounter\\errors.log prüfen.'
+                          if unreadable else '')
+            self.status = (self.error if unreadable else
+                           'Replay-Scan abgeschlossen – Synchronisierung läuft'
                            if datafile.is_file() else
                            'Replay-Scan beendet – keine auswertbaren Matches exportiert')
             return True
@@ -1125,6 +1139,7 @@ class ManagedLiveEngine:
         self._stop.clear()
         self.state = 'Einrichtung'
         self.error = ''
+        self.warning = ''
         self.count = self.certain = self.last_raw = 0
         self.round_id = self.core.round_id
         with self.core.lock:
@@ -1144,6 +1159,9 @@ class ManagedLiveEngine:
             if self._stop.is_set():
                 return
             german = self.store.german_available()
+            if not german:
+                self.warning = ('Deutsch ohne TRUHE-Kalibrierung nur eingeschränkt '
+                                'erkennbar; Englisch bleibt verfügbar')
             # EN is always supported by the pinned upstream templates. DE
             # additionally needs an actual calibrated TRUHE image; without
             # one only its language-independent object cue can contribute.
@@ -1219,7 +1237,8 @@ class ManagedLiveEngine:
                     reason = (f'Bildanalyse beendet (Code {exit_code})'
                               if exit_code else
                               'Bildanalyse ohne Monitor-Verbindung beendet')
-                    raise RuntimeError(reason + (': ' + detail if detail else '.'))
+                    hint = self.error or detail
+                    raise RuntimeError(reason + (': ' + hint if hint else '.'))
                 self.state = 'Beendet'
         except Exception as exc:
             self.error = str(exc)[:240]

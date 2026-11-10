@@ -16,7 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'SquadLoot-Windows-Client'))
 from client_core import Core
 from vision import (ManagedLiveEngine, ManagedReplayEngine,
-                    _best_monitor_for_windows, _ppm_from_bgra)
+                    _best_monitor_for_windows, _ppm_from_bgra,
+                    managed_replay_data_file)
 
 
 class TestMonitorSelection(unittest.TestCase):
@@ -181,6 +182,46 @@ class TestManagedLiveWorker(unittest.TestCase):
 
 
 class TestReplayExtra(unittest.TestCase):
+    def test_custom_legacy_json_basename_uses_actual_managed_output(self):
+        with tempfile.TemporaryDirectory() as temp:
+            alias = Path(temp) / 'other-name.json'
+            correct = Path(temp) / 'data.json'
+            self.assertEqual(managed_replay_data_file({'data_json': str(alias)}), correct)
+            correct.write_text(json.dumps({'Matches': [{
+                'SessionId': 'from-correct-json', 'ReplayFile': 'r.replay',
+                'PlayerName': 'Tester', 'ChestsOpened': 11}]}), encoding='utf-8')
+            core = Core(config={'client_id': 'pc', 'data_json': str(alias)},
+                        state={'sent': {}, 'replay_rounds': {}})
+            class Api:
+                def call(self, path, body=None):
+                    self.assertion = body
+                    return {'ok': True}
+            api = Api()
+            with patch('client_core.STATE', Path(temp) / 'state.json'):
+                self.assertEqual(core.sync_matches(api), 1)
+            self.assertEqual(api.assertion['chests'], 11)
+
+    def test_unreadable_replay_reports_warning_without_blocking_other_uploads(self):
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            replay = folder / 'game.replay'
+            replay.write_bytes(b'bad replay')
+            import os
+            aged = time.time() - 40
+            os.utime(replay, (aged, aged))
+            core = SimpleNamespace(
+                config={'replay_dir': str(folder), 'data_json': str(folder / 'data.json')},
+                stop=threading.Event())
+            store = SimpleNamespace(ensure_replay=lambda: folder / 'ChestCounter.exe')
+            engine = ManagedReplayEngine(core, store=store)
+            fake = SimpleNamespace(returncode=0,
+                stdout=b'Cannot read this replay: unknown replay format',
+                stderr=b'')
+            with patch('vision._subprocess2.run', return_value=fake):
+                self.assertTrue(engine.scan_once(force=True))
+            self.assertEqual(engine.finished, 1)
+            self.assertIn('nicht lesbar', engine.error)
+
     def test_concurrent_sync_does_not_double_upload(self):
         with tempfile.TemporaryDirectory() as temp:
             data = Path(temp) / 'data.json'

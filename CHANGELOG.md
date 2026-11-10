@@ -21,6 +21,9 @@
   anstatt sofort eine alte `data.json` hochzuladen.
 - Erfolgscode 0 von einer *zweiten* ChestCounter-Instanz wird nicht mehr als
   abgeschlossene Auswertung fehlinterpretiert.
+- Ein alter, abweichender Dateiname für `data_json` wird auf die tatsächliche
+  ChestCounter-Ausgabe `data.json` normalisiert. Einzelne unlesbare
+  Replays erscheinen als Warnung und blockieren keine anderen Uploads.
 - Eine Replay-Diagnose zeigt lokale Dateien, auswertbare Matches, gesendete Daten und Fehler ohne Credentials.
 - Replay-Upload, Live-Zähler und Serverstatus werden unabhängig abgefragt:
   ein Upload-Fehler blockiert nicht mehr alle weiteren Aktualisierungen.

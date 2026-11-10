@@ -88,3 +88,27 @@ Farbbedeutung, ueberall gleich:
 
 Einstellungen und Datenbank bleiben unveraendert; es ist keine Neueinrichtung
 noetig. Das Update kommt wie gewohnt automatisch vom Pi.
+
+
+SQUADLOOT 1.5.0 - HUD + VISUELLER LIVE-TEST
+===========================================
+
+1. Kompaktes In-Game-HUD von Claude (188 x 60 px bei 100 % DPI), standardmaessig
+   AUS, optional erweiterbar; Einstellungen -> In-Game-HUD.
+2. Optional: Fortnite Visual Chest Counter v0.2.3 separat starten,
+   dort Screen 1/2 und Start counting waehlen.
+3. In SquadLoot -> Live-Tracking -> Visueller Kistenzaehler: Den
+   obs_output-Ordner der externen Anwendung waehlen, Live-Test starten.
+4. SquadLoot liest certain_chests.txt und approximate_chests.txt, zaehlt nur
+   neue APPROX-Aenderungen ab Teststart, nie die alten Gesamtsummen.
+5. CERTAIN steckt bereits in APPROX und wird NICHT addiert. Neue Runde
+   setzt die Baseline zurueck. Replaydaten bleiben verbindlich.
+6. Der externe Zaehler erkennt derzeit vor allem englische/portugiesische
+   XP-Texte, DEUTSCH ist noch nicht unterstuetzt. Fuer den Test Englisch nutzen.
+7. Alte PNG-basierte SquadLoot-Erkennung kann alternativ weiter verwendet
+   werden. Beide Scanner laufen nie parallel.
+8. Ausfuehrliche Anleitung auf GitHub unter docs/VISUAL-LIVE-TEST.md.
+
+Der Test startet nie ungefragt und fuegt dem Windows-Paket keine weiteren
+Dateien hinzu. Die exakte Fortnite-Erkennung und Anti-Cheat-Vertraeglichkeit
+sind nicht offiziell garantiert. Bitte zuerst mit Video testen.

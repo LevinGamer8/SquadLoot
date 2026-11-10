@@ -170,3 +170,156 @@ class VisionDetector:
         except Exception as exc:
             self.error = str(exc)[:180]
             self.state = 'Fehler'
+
+
+# ---------------------------------------------------------------------------
+# Optional Fortnite Visual Chest Counter v0.2.x file bridge.
+# The third-party visual detector runs separately, never in our process.
+# Its OBS outputs are cumulative and persist between sessions: only POSITIVE
+# deltas after starting this bridge are counted for the CURRENT SquadLoot round.
+# This avoids importing a 155-MB video engine into every Windows update.
+# No images, video, keyboard events, or detector logs leave this PC.
+# ---------------------------------------------------------------------------
+import re as _re
+
+
+def _visual_file_count(path: Path) -> int:
+    """Parse a single numeric OBS text file, e.g. 'APPROX. OPENED CHESTS: 1,234'."""
+    path = Path(path)
+    if path.stat().st_size > 4096:
+        raise ValueError(f'{path.name}: Textdatei ist unerwartet groß.')
+    text = path.read_text(encoding='utf-8-sig').strip()
+    if '/' in text:
+        raise ValueError(f'{path.name}: bitte keine Zählerwerte im Format 3/500 verwenden.')
+    # The external app lets users customize labels; accept any label whose last
+    # token is an unsigned decimal counter, with optional thousands commas.
+    match = _re.search(r'(?<!\d)(\d[\d,]*)\s*$', text)
+    if not match:
+        raise ValueError(f'{path.name}: keine Zählerzahl am Textende. '
+                         'Bitte in Visual Chest Counter die Standard-Anzeige einstellen.')
+    number = match.group(1)
+    if not (_re.fullmatch(r'\d+', number) or
+            _re.fullmatch(r'\d{1,3}(?:,\d{3})+', number)):
+        raise ValueError(f'{path.name}: ungültiges Zahlenformat.')
+    value = int(number.replace(',', ''))
+    if not 0 <= value <= 1000000:
+        raise ValueError(f'{path.name}: Wert außerhalb des erwarteten Bereichs.')
+    return value
+
+
+def read_visual_counts(folder) -> tuple[int, int]:
+    """Return (certain, approximate TOTAL); approx already includes certain."""
+    folder = Path(folder)
+    if not folder.is_dir():
+        raise FileNotFoundError(f'OBS-Ordner nicht vorhanden: {folder}')
+    certain = _visual_file_count(folder / 'certain_chests.txt')
+    approximate = _visual_file_count(folder / 'approximate_chests.txt')
+    if certain > approximate:
+        raise ValueError('Visual Counter: CERTAIN ist größer als APPROX. '
+                         'Bitte die Original-Anzeigeformate prüfen.')
+    return certain, approximate
+
+
+class VisualCounterBridge:
+    """Opt-in read-only adapter for the external visual detector's OBS text files.
+
+    Does not spawn or control the external executable. At start it snapshots the
+    already existing cumulative totals as a baseline, ignoring old rounds. When
+    SquadLoot begins a new round the baseline is reset, so no stale counts are
+    attributed to the new round. At most one vision source should be active.
+    """
+
+    def __init__(self, core):
+        self.core = core
+        self.folder = None
+        self.running = False
+        self.last_raw = None
+        self.last_round = None
+        self.estimated = 0
+        self.certain = 0
+        self.error = ''
+        self.state = 'Aus'
+        self.last_event_at = None
+
+    def start(self, folder):
+        values = read_visual_counts(folder)
+        self.folder = Path(folder)
+        with self.core.lock:
+            self.last_round = self.core.round_id
+            self.core.vision = 0
+            self.core.last_live = 0.0
+        self.last_raw = values
+        self.estimated = 0
+        self.certain = 0
+        self.error = ''
+        self.running = True
+        self.state = 'Aktiv · warte auf neue Kisten'
+
+    def stop(self):
+        self.running = False
+        self.state = 'Aus'
+
+    def reset_baseline(self):
+        """Used when the user deliberately resets provisional local counts."""
+        if not self.running:
+            return
+        try:
+            self.last_raw = read_visual_counts(self.folder)
+            with self.core.lock:
+                self.last_round = self.core.round_id
+            self.estimated = self.certain = 0
+            self.error = ''
+            self.state = 'Zähler für diese Runde zurückgesetzt'
+        except (OSError, ValueError) as exc:
+            self.error = str(exc)[:200]
+            self.state = 'Quelldateien nicht lesbar'
+
+    def poll(self):
+        """Call from the existing 1s GUI refresh; never starts its own loop."""
+        if not self.running:
+            return False
+        try:
+            values = read_visual_counts(self.folder)
+        except (OSError, ValueError) as exc:
+            self.error = str(exc)[:200]
+            self.state = 'Quelle nicht lesbar · keine neuen Werte'
+            return False
+        with self.core.lock:
+            round_id = self.core.round_id
+        if round_id != self.last_round:
+            # The source is continuous, our match counter is not.
+            self.last_round = round_id
+            self.last_raw = values
+            self.estimated = self.certain = 0
+            with self.core.lock:
+                self.core.vision = 0
+                self.core.last_live = 0.0
+            self.error = ''
+            self.state = 'Neue Runde · Referenzwert übernommen'
+            return False
+        if self.last_raw is None:
+            self.last_raw = values
+            return False
+        if values[0] < self.last_raw[0] or values[1] < self.last_raw[1]:
+            # External Reset/Profile switch: never treat a smaller cumulative
+            # value as new chests or negate previously counted events.
+            self.last_raw = values
+            self.error = ''
+            self.state = 'Quellzähler zurückgesetzt · warte auf neue Kisten'
+            return False
+        new_certain = values[0] - self.last_raw[0]
+        new_approx = values[1] - self.last_raw[1]
+        self.last_raw = values
+        if not new_certain and not new_approx:
+            self.error = ''
+            self.state = 'Aktiv · warte auf neue Kisten'
+            return False
+        self.certain = min(100000, self.certain + new_certain)
+        self.estimated = min(100000, self.estimated + new_approx)
+        with self.core.lock:
+            self.core.vision = self.estimated
+            self.core.last_live = 0.0
+        self.last_event_at = time.monotonic()
+        self.state = 'Aktiv · neuer visueller Kistenfund'
+        self.error = ''
+        return bool(new_approx)

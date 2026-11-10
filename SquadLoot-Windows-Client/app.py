@@ -32,7 +32,7 @@ from tkinter import filedialog, font as tkfont, messagebox
 from client_core import (Core, CONFIG, chestcounter_exe, read_json, sync_once,
                          validate_url)
 from update_manager import current_version, check_and_stage, log_error
-from vision import VisionDetector
+from vision import VisionDetector, VisualCounterBridge
 
 # --------------------------------------------------------------------------
 # Display scaling
@@ -278,6 +278,13 @@ ICONS: dict[str, list] = {
                 ('d', [7.4, 4.8, 12.0, 9.4]), ('d', [13.6, 14.0, 18.2, 18.6])],
     'spark': [('p', [12, 3.2, 14.2, 9.8, 20.8, 12, 14.2, 14.2, 12, 20.8, 9.8, 14.2,
                      3.2, 12, 9.8, 9.8], True)],
+    'lock': [('p', [4.6, 10.6, 19.4, 10.6, 19.4, 20.4, 4.6, 20.4], True),
+             ('a', [7.4, 3.4, 16.6, 12.6, 0, 180]), ('d', [10.8, 14.2, 13.2, 16.6])],
+    'unlock': [('p', [4.6, 10.6, 19.4, 10.6, 19.4, 20.4, 4.6, 20.4], True),
+               ('a', [7.4, 3.4, 16.6, 12.6, 90, 90]), ('d', [10.8, 14.2, 13.2, 16.6])],
+    'layout': [('p', [2.8, 4.6, 21.2, 4.6, 21.2, 19.4, 2.8, 19.4], True),
+               ('p', [5.8, 8.0, 12.4, 8.0, 12.4, 11.4, 5.8, 11.4], True),
+               ('p', [5.8, 14.6, 15.4, 14.6], False)],
     'film': [('p', [3.2, 5.6, 20.8, 5.6, 20.8, 18.4, 3.2, 18.4], True),
              ('p', [3.2, 10.0, 20.8, 10.0], False), ('p', [3.2, 14.0, 20.8, 14.0], False),
              ('p', [8.0, 5.6, 8.0, 18.4], False), ('p', [16.0, 5.6, 16.0, 18.4], False)],
@@ -666,6 +673,92 @@ class Toggle(tk.Canvas):
                          fill=T.TEXT if on else T.DIM, font=font(12))
 
 
+class Slider(tk.Canvas):
+    """Rounded value slider: drag the knob, click the track, or use the arrows."""
+
+    def __init__(self, parent, value=1.0, minimum=0.0, maximum=1.0, step=0.01,
+                 command=None, commit=None, bg=None, tone=T.ACCENT, width=None):
+        bg = bg or parent.cget('bg')
+        self.minimum, self.maximum, self.step = float(minimum), float(maximum), float(step)
+        self.tone = tone
+        self._value = self._snap(value)
+        self._command = command or (lambda v: None)
+        self._commit = commit or (lambda v: None)
+        self._hover = self._drag = False
+        super().__init__(parent, bg=bg, bd=0, highlightthickness=0,
+                         height=px(22), width=width or px(170),
+                         cursor='hand2', takefocus=1)
+        self.bind('<Configure>', lambda e: self._paint())
+        self.bind('<ButtonPress-1>', self._press)
+        self.bind('<B1-Motion>', self._motion)
+        self.bind('<ButtonRelease-1>', self._release)
+        self.bind('<Enter>', lambda e: self._set_hover(True))
+        self.bind('<Leave>', lambda e: self._set_hover(False))
+        self.bind('<Left>', lambda e: self._nudge(-1))
+        self.bind('<Right>', lambda e: self._nudge(1))
+
+    def _snap(self, value):
+        value = max(self.minimum, min(self.maximum, float(value)))
+        steps = round((value - self.minimum) / self.step)
+        return round(self.minimum + steps * self.step, 4)
+
+    def get(self):
+        return self._value
+
+    def set(self, value, notify=False):
+        value = self._snap(value)
+        if value != self._value:
+            self._value = value
+            self._paint()
+            if notify:
+                self._command(value)
+
+    def _set_hover(self, hover):
+        self._hover = hover
+        self._paint()
+
+    def _nudge(self, direction):
+        self.set(self._value + direction * self.step, notify=True)
+        self._commit(self._value)
+
+    def _from_x(self, x):
+        pad = px(9)
+        span = max(1, self.winfo_width() - 2 * pad)
+        return self.minimum + (self.maximum - self.minimum) * ((x - pad) / span)
+
+    def _press(self, event):
+        self._drag = True
+        self.focus_set()
+        self.set(self._from_x(event.x), notify=True)
+
+    def _motion(self, event):
+        if self._drag:
+            self.set(self._from_x(event.x), notify=True)
+
+    def _release(self, _event):
+        if self._drag:
+            self._drag = False
+            self._commit(self._value)
+
+    def _paint(self):
+        self.delete('all')
+        w, h = self.winfo_width(), self.winfo_height()
+        if w < 12:
+            return
+        pad, cy = px(9), h / 2
+        track = px(5)
+        round_rect(self, pad, cy - track / 2, w - pad, cy + track / 2,
+                   track / 2, T.SURFACE_3, T.SURFACE_3)
+        span = (self._value - self.minimum) / max(1e-9, self.maximum - self.minimum)
+        knob_x = pad + (w - 2 * pad) * span
+        if span > 0:
+            round_rect(self, pad, cy - track / 2, max(pad + track, knob_x),
+                       cy + track / 2, track / 2, self.tone, self.tone)
+        r = px(8 if (self._hover or self._drag) else 7)
+        self.create_oval(knob_x - r, cy - r, knob_x + r, cy + r,
+                         fill='#FFFFFF', outline=self.tone, width=px(2))
+
+
 class SlimScrollbar(tk.Canvas):
     """Minimal rounded scrollbar that hides itself when everything fits."""
 
@@ -953,6 +1046,629 @@ def divider(parent, bg=None, pady=None):
 
 
 # --------------------------------------------------------------------------
+# In-game HUD
+# --------------------------------------------------------------------------
+# A small always-on-top card that sits over Fortnite in borderless/windowed
+# mode. It is a plain Tk Toplevel plus a handful of documented Win32 window
+# styles - no injection, no DirectX hook, no access to the game process.
+
+HUD_DEFAULTS = {
+    'hud_enabled': False,          # show the HUD at startup
+    'hud_mode': 'compact',         # 'compact' | 'expanded'
+    'hud_opacity': 0.92,           # 0.35 .. 1.0
+    'hud_scale': 1.0,              # 0.8 .. 1.6, on top of the display scaling
+    'hud_locked': True,            # locked = click-through, unlocked = draggable
+    'hud_x': None,
+    'hud_y': None,
+    'hud_hotkey_toggle': 'Ctrl+Alt+H',
+    'hud_hotkey_lock': 'Ctrl+Alt+L',
+    'hud_hotkey_mode': 'Ctrl+Alt+E',
+}
+
+# Colour key for the transparent area around the card. Never used for content.
+HUD_KEY = '#010203'
+
+MOD_ALT, MOD_CONTROL, MOD_SHIFT, MOD_WIN, MOD_NOREPEAT = 1, 2, 4, 8, 0x4000
+HOTKEY_MODS = {'ctrl': MOD_CONTROL, 'control': MOD_CONTROL, 'strg': MOD_CONTROL,
+               'alt': MOD_ALT, 'shift': MOD_SHIFT, 'umschalt': MOD_SHIFT,
+               'win': MOD_WIN, 'super': MOD_WIN}
+HOTKEY_KEYS = {'SPACE': 0x20, 'LEERTASTE': 0x20, 'INSERT': 0x2D, 'EINFG': 0x2D,
+               'DELETE': 0x2E, 'ENTF': 0x2E, 'HOME': 0x24, 'POS1': 0x24,
+               'END': 0x23, 'ENDE': 0x23, 'PAGEUP': 0x21, 'PAGEDOWN': 0x22,
+               'TAB': 0x09, 'ESC': 0x1B, 'ESCAPE': 0x1B}
+HOTKEY_KEYS.update({f'F{n}': 0x6F + n for n in range(1, 13)})
+
+
+def parse_hotkey(text):
+    """'Ctrl+Alt+H' -> (modifiers, virtual key). Empty text disables the hotkey.
+
+    At least one modifier is required on purpose: a bare key would be swallowed
+    system-wide and could break Fortnite or ChestCounter.
+    """
+    text = (text or '').strip()
+    if not text:
+        return None
+    parts = [part.strip() for part in text.replace('-', '+').split('+') if part.strip()]
+    if not parts:
+        return None
+    mods, key = 0, None
+    for part in parts:
+        lowered = part.lower()
+        if lowered in HOTKEY_MODS:
+            mods |= HOTKEY_MODS[lowered]
+        elif key is None:
+            key = part.upper()
+        else:
+            raise ValueError('Nur eine Taste plus Modifikatoren, z. B. Strg+Alt+H.')
+    if key is None:
+        raise ValueError('Es fehlt die eigentliche Taste, z. B. Strg+Alt+H.')
+    if not mods:
+        raise ValueError('Mindestens Strg, Alt oder Shift verwenden, damit die '
+                         'Taste nicht im Spiel verloren geht.')
+    if key in HOTKEY_KEYS:
+        return mods | MOD_NOREPEAT, HOTKEY_KEYS[key]
+    if len(key) == 1 and key.isascii() and key.isalnum():
+        return mods | MOD_NOREPEAT, ord(key)
+    raise ValueError(f'Unbekannte Taste "{key}".')
+
+
+class Win32:
+    """Thin ctypes wrapper. Every call is a no-op outside Windows."""
+
+    GWL_EXSTYLE = -20
+    WS_EX_LAYERED = 0x00080000
+    WS_EX_TRANSPARENT = 0x00000020
+    WS_EX_TOOLWINDOW = 0x00000080
+    WS_EX_NOACTIVATE = 0x08000000
+    HWND_TOPMOST = -1
+    SWP_NOMOVE_NOSIZE_NOACTIVATE = 0x0002 | 0x0001 | 0x0010
+
+    available = os.name == 'nt'
+
+    @staticmethod
+    def handle(window):
+        """HWND of a Tk toplevel, following Tk's wrapper frame when present."""
+        if not Win32.available:
+            return 0
+        try:
+            hwnd = window.winfo_id()
+            parent = ctypes.windll.user32.GetParent(hwnd)
+            return parent or hwnd
+        except (AttributeError, OSError, tk.TclError):
+            return 0
+
+    @staticmethod
+    def set_overlay_styles(window, click_through):
+        """Tool window (no taskbar button), never focus-stealing, optionally
+        click-through so every mouse event lands in the game instead."""
+        hwnd = Win32.handle(window)
+        if not hwnd:
+            return False
+        try:
+            user32 = ctypes.windll.user32
+            style = user32.GetWindowLongW(hwnd, Win32.GWL_EXSTYLE)
+            style |= (Win32.WS_EX_LAYERED | Win32.WS_EX_TOOLWINDOW
+                      | Win32.WS_EX_NOACTIVATE)
+            if click_through:
+                style |= Win32.WS_EX_TRANSPARENT
+            else:
+                style &= ~Win32.WS_EX_TRANSPARENT
+            user32.SetWindowLongW(hwnd, Win32.GWL_EXSTYLE, style)
+            return True
+        except (AttributeError, OSError):
+            return False
+
+    @staticmethod
+    def raise_topmost(window):
+        hwnd = Win32.handle(window)
+        if not hwnd:
+            return False
+        try:
+            ctypes.windll.user32.SetWindowPos(
+                hwnd, Win32.HWND_TOPMOST, 0, 0, 0, 0,
+                Win32.SWP_NOMOVE_NOSIZE_NOACTIVATE)
+            return True
+        except (AttributeError, OSError):
+            return False
+
+    @staticmethod
+    def virtual_screen():
+        """(x, y, width, height) across all monitors, or None."""
+        if not Win32.available:
+            return None
+        try:
+            metric = ctypes.windll.user32.GetSystemMetrics
+            box = (metric(76), metric(77), metric(78), metric(79))
+            return box if box[2] > 0 and box[3] > 0 else None
+        except (AttributeError, OSError):
+            return None
+
+
+class HotkeyListener(threading.Thread):
+    """Optional global shortcuts via RegisterHotKey (Windows only).
+
+    Runs its own message loop because RegisterHotKey delivers WM_HOTKEY to the
+    registering thread. Firing a hotkey only puts a name into a queue; the Tk
+    thread acts on it in the normal refresh tick.
+    """
+
+    WM_HOTKEY = 0x0312
+    WM_QUIT = 0x0012
+
+    def __init__(self, bindings, sink):
+        super().__init__(daemon=True, name='SquadLootHotkeys')
+        self.bindings = list(bindings)       # [(name, (mods, vk)), ...]
+        self.sink = sink
+        self.thread_id = 0
+        self.error = ''
+        self.registered = []
+        self._ready = threading.Event()
+
+    def run(self):
+        if not Win32.available or not self.bindings:
+            self._ready.set()
+            return
+        try:
+            import ctypes.wintypes as wintypes
+            user32 = ctypes.windll.user32
+            self.thread_id = ctypes.windll.kernel32.GetCurrentThreadId()
+            for index, (name, combo) in enumerate(self.bindings, start=1):
+                if user32.RegisterHotKey(None, index, combo[0], combo[1]):
+                    self.registered.append(name)
+                else:
+                    self.error = ('Mindestens ein Tastenkürzel ist bereits von '
+                                  'einem anderen Programm belegt.')
+            self._ready.set()
+            message = wintypes.MSG()
+            while user32.GetMessageW(ctypes.byref(message), None, 0, 0) > 0:
+                if message.message == self.WM_HOTKEY:
+                    index = int(message.wParam) - 1
+                    if 0 <= index < len(self.bindings):
+                        self.sink(self.bindings[index][0])
+        except Exception as exc:          # a broken hotkey must not kill the app
+            self.error = str(exc)[:160]
+        finally:
+            self._ready.set()
+            try:
+                for index in range(1, len(self.bindings) + 1):
+                    ctypes.windll.user32.UnregisterHotKey(None, index)
+            except (AttributeError, OSError):
+                pass
+
+    def stop(self):
+        if self.thread_id:
+            try:
+                ctypes.windll.user32.PostThreadMessageW(
+                    self.thread_id, self.WM_QUIT, 0, 0)
+            except (AttributeError, OSError):
+                pass
+
+
+class Hud:
+    """Compact in-game overlay: squad count, personal count, status dot.
+
+    Everything is drawn on a single canvas and only repainted when a displayed
+    value actually changes, so an idle HUD costs nothing while Fortnite runs.
+    """
+
+    MIN_W = 188
+    HEAD_H = 60
+    ROW_H = 20
+
+    def __init__(self, master, core, on_change=None):
+        self.master = master
+        self.core = core
+        self.on_change = on_change or (lambda: None)
+        self.win = None
+        self.canvas = None
+        self.menu = None
+        self._fonts = {}
+        self._signature = None
+        self._drag_from = None
+        self._size = (0, 0)
+        self._topmost_tick = 0
+        self.data = {'squad': 0, 'personal': 0, 'round': None, 'connected': False,
+                     'confirmed': 0, 'estimated': 0, 'members': [],
+                     'personal_confirmed': False, 'error': False}
+
+    # ---- configuration -------------------------------------------------
+    def opt(self, key):
+        return self.core.config.get(key, HUD_DEFAULTS[key])
+
+    def save(self, **values):
+        self.core.set_config(values)
+
+    @property
+    def visible(self):
+        return self.win is not None
+
+    def scale(self):
+        try:
+            user = float(self.opt('hud_scale'))
+        except (TypeError, ValueError):
+            user = 1.0
+        return SCALE * max(0.8, min(1.6, user))
+
+    def u(self, value):
+        """Design pixel -> device pixel, including the user's HUD scale."""
+        return max(1, int(round(value * self.scale())))
+
+    def fnt(self, size, weight='normal'):
+        key = (size, weight, round(self.scale(), 3))
+        if key not in self._fonts:
+            self._fonts[key] = (family(), -max(7, int(round(size * self.scale()))), weight)
+        return self._fonts[key]
+
+    def measure(self, text, size, weight='normal'):
+        try:
+            return tkfont.Font(font=self.fnt(size, weight)).measure(text)
+        except tk.TclError:
+            return int(len(text) * size * 0.62 * self.scale())
+
+    # ---- geometry ------------------------------------------------------
+    def screen_box(self):
+        box = Win32.virtual_screen()
+        if box:
+            return box
+        try:
+            width = self.master.winfo_vrootwidth() or self.master.winfo_screenwidth()
+            height = self.master.winfo_vrootheight() or self.master.winfo_screenheight()
+        except tk.TclError:
+            width, height = 1920, 1080
+        return 0, 0, width, height
+
+    def default_position(self, width, height):
+        """Top left, clear of Fortnite's centre and of the recognition region."""
+        x, y, box_w, box_h = self.screen_box()
+        return x + max(self.u(24), int(box_w * 0.02)), y + max(self.u(90), int(box_h * 0.1))
+
+    def clamp(self, x, y, width, height):
+        """Keep the card fully on a real monitor after a resolution change."""
+        box_x, box_y, box_w, box_h = self.screen_box()
+        x = int(min(max(x, box_x), box_x + box_w - width))
+        y = int(min(max(y, box_y), box_y + box_h - height))
+        return x, y
+
+    def vision_region(self):
+        """The area vision.py samples, in screen pixels (primary monitor)."""
+        try:
+            width = self.master.winfo_screenwidth()
+            height = self.master.winfo_screenheight()
+        except tk.TclError:
+            return None
+        return (int(width * .26), int(height * .29), int(width * .74), int(height * .72))
+
+    def overlaps_vision_region(self):
+        """True when the card sits inside the screen-recognition sample area."""
+        if not self.visible:
+            return False
+        region = self.vision_region()
+        if not region:
+            return False
+        left, top = self.win.winfo_x(), self.win.winfo_y()
+        right, bottom = left + self._size[0], top + self._size[1]
+        return not (right <= region[0] or left >= region[2]
+                    or bottom <= region[1] or top >= region[3])
+
+    # ---- window lifecycle ----------------------------------------------
+    def show(self):
+        if self.win is not None:
+            return
+        win = tk.Toplevel(self.master)
+        self.win = win
+        win.withdraw()
+        win.title('SquadLoot HUD')
+        try:
+            win.overrideredirect(True)      # no title bar, no taskbar button
+        except tk.TclError:
+            pass
+        win.configure(bg=HUD_KEY)
+        win.resizable(False, False)
+        for attribute, value in (('-topmost', True), ('-transparentcolor', HUD_KEY)):
+            try:
+                win.attributes(attribute, value)
+            except tk.TclError:
+                # X11 has no transparent colour key; the card simply keeps its
+                # own dark background there.
+                if attribute == '-transparentcolor':
+                    win.configure(bg=T.BG)
+        self.apply_opacity()
+        self.canvas = tk.Canvas(win, bg=win.cget('bg'), bd=0, highlightthickness=0,
+                                takefocus=0)
+        self.canvas.pack(fill='both', expand=True)
+        self.canvas.bind('<ButtonPress-1>', self._drag_start)
+        self.canvas.bind('<B1-Motion>', self._drag_move)
+        self.canvas.bind('<ButtonRelease-1>', self._drag_end)
+        self.canvas.bind('<Button-3>', self._popup)
+        win.protocol('WM_DELETE_WINDOW', self.hide)
+        self._signature = None
+        self._size = (0, 0)
+        self.apply_click_through()
+        self.redraw(force=True)
+        win.deiconify()
+        Win32.raise_topmost(win)
+
+    def hide(self):
+        if self.win is None:
+            return
+        self.store_position()
+        if self.menu is not None:
+            try:
+                self.menu.destroy()
+            except tk.TclError:
+                pass
+            self.menu = None
+        try:
+            self.win.destroy()
+        except tk.TclError:
+            pass
+        self.win = None
+        self.canvas = None
+        self._signature = None
+        # Forget the geometry as well: resize() short-circuits on an unchanged
+        # size, so a stale value would leave the next window unpositioned.
+        self._size = (0, 0)
+
+    def set_enabled(self, enabled):
+        self.save(hud_enabled=bool(enabled))
+        if enabled:
+            self.show()
+        else:
+            self.hide()
+        self.on_change()
+
+    def toggle(self):
+        self.set_enabled(not self.visible)
+
+    def set_mode(self, mode):
+        self.save(hud_mode='expanded' if mode == 'expanded' else 'compact')
+        self.redraw(force=True)
+        self.on_change()
+
+    def toggle_mode(self):
+        self.set_mode('compact' if self.opt('hud_mode') == 'expanded' else 'expanded')
+
+    def set_locked(self, locked):
+        self.save(hud_locked=bool(locked))
+        self.apply_click_through()
+        self.redraw(force=True)
+        self.on_change()
+
+    def toggle_lock(self):
+        self.set_locked(not self.opt('hud_locked'))
+
+    def apply_opacity(self):
+        if self.win is None:
+            return
+        try:
+            value = float(self.opt('hud_opacity'))
+        except (TypeError, ValueError):
+            value = HUD_DEFAULTS['hud_opacity']
+        try:
+            self.win.attributes('-alpha', max(0.35, min(1.0, value)))
+        except tk.TclError:
+            pass
+
+    def apply_click_through(self):
+        if self.win is not None:
+            Win32.set_overlay_styles(self.win, bool(self.opt('hud_locked')))
+
+    def reset_position(self):
+        self.save(hud_x=None, hud_y=None)
+        if self.win is not None:
+            width, height = self._size
+            x, y = self.default_position(width, height)
+            self.win.geometry(f'+{x}+{y}')
+            self.store_position()
+        self.on_change()
+
+    def store_position(self):
+        if self.win is None:
+            return
+        try:
+            self.save(hud_x=int(self.win.winfo_x()), hud_y=int(self.win.winfo_y()))
+        except tk.TclError:
+            pass
+
+    # ---- interaction ----------------------------------------------------
+    def _drag_start(self, event):
+        if self.opt('hud_locked'):
+            return
+        self._drag_from = (event.x_root - self.win.winfo_x(),
+                           event.y_root - self.win.winfo_y())
+
+    def _drag_move(self, event):
+        if self._drag_from is None:
+            return
+        x = event.x_root - self._drag_from[0]
+        y = event.y_root - self._drag_from[1]
+        x, y = self.clamp(x, y, *self._size)
+        self.win.geometry(f'+{x}+{y}')
+
+    def _drag_end(self, _event):
+        if self._drag_from is not None:
+            self._drag_from = None
+            self.store_position()
+            self.on_change()
+
+    def _popup(self, event):
+        if self.win is None:
+            return
+        if self.menu is None:
+            self.menu = tk.Menu(self.win, tearoff=0, bg=T.SURFACE_2, fg=T.TEXT,
+                                activebackground=T.ACCENT, activeforeground='#FFFFFF',
+                                bd=0, relief='flat', font=font(12))
+        self.menu.delete(0, 'end')
+        expanded = self.opt('hud_mode') == 'expanded'
+        locked = bool(self.opt('hud_locked'))
+        self.menu.add_command(label='Kompakt' if expanded else 'Erweitert',
+                              command=self.toggle_mode)
+        self.menu.add_command(label='Entsperren (verschiebbar)' if locked
+                              else 'Sperren (klick-durchlässig)',
+                              command=self.toggle_lock)
+        self.menu.add_command(label='Position zurücksetzen', command=self.reset_position)
+        self.menu.add_separator()
+        self.menu.add_command(label='HUD ausblenden', command=lambda: self.set_enabled(False))
+        try:
+            self.menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.menu.grab_release()
+
+    # ---- painting --------------------------------------------------------
+    def update(self, data):
+        """Called once per refresh tick; repaints only when something changed."""
+        if self.win is None:
+            return
+        self.data = data
+        self.redraw()
+        self._topmost_tick += 1
+        if self._topmost_tick % 10 == 0:
+            Win32.raise_topmost(self.win)
+
+    def signature(self):
+        data = self.data
+        base = (self.opt('hud_mode'), round(self.scale(), 3), bool(self.opt('hud_locked')),
+                data['squad'], data['personal'], data['round'], data['connected'],
+                data['error'], data['confirmed'], data['estimated'],
+                data['personal_confirmed'])
+        if self.opt('hud_mode') == 'expanded':
+            base += tuple((m['name'], m['value'], m['confirmed'], m['online'])
+                          for m in data['members'])
+        return base
+
+    def tones(self):
+        data = self.data
+        if data['round'] is None:
+            squad = T.MUTE
+        elif data['estimated'] == 0 and data['confirmed'] > 0:
+            squad = T.OK
+        else:
+            squad = T.CYAN
+        personal = T.OK if data['personal_confirmed'] else (
+            T.CYAN if data['round'] is not None else T.MUTE)
+        if data['error']:
+            status = T.BAD
+        elif data['connected']:
+            status = T.OK
+        else:
+            status = T.MUTE
+        return squad, personal, status
+
+    def redraw(self, force=False):
+        if self.win is None or self.canvas is None:
+            return
+        signature = self.signature()
+        if not force and signature == self._signature:
+            return
+        self._signature = signature
+        squad_tone, personal_tone, status_tone = self.tones()
+        squad_text = str(self.data['squad'])
+        personal_text = str(self.data['personal'])
+
+        cursor = self.u(14)
+        gap = self.u(9)
+        icon_box = self.u(15)
+        centre = self.u(24)
+        chest_cx = cursor + icon_box / 2
+        cursor += icon_box + gap
+        squad_x = cursor
+        squad_w = max(self.measure(squad_text, 25, 'bold'), self.measure('SQUAD', 9, 'bold'))
+        cursor += squad_w + self.u(15)
+        divider_x = cursor
+        cursor += self.u(15)
+        user_box = self.u(13)
+        user_cx = cursor + user_box / 2
+        cursor += user_box + self.u(8)
+        personal_x = cursor
+        personal_w = max(self.measure(personal_text, 18, 'bold'), self.measure('DU', 9, 'bold'))
+        cursor += personal_w + self.u(18)
+
+        width = max(self.u(self.MIN_W), int(cursor))
+        height = self.u(self.HEAD_H)
+        members = self.data['members'] if self.opt('hud_mode') == 'expanded' else []
+        if self.opt('hud_mode') == 'expanded':
+            rows = members or [None]
+            name_w = max([self.measure(str(m['name'])[:14], 11) for m in members] or [self.u(70)])
+            width = max(width, int(self.u(30) + name_w + self.u(26)
+                                   + self.measure('999', 12, 'bold') + self.u(26)))
+            width = min(width, self.u(320))
+            height += self.u(4) + len(rows) * self.u(self.ROW_H) + self.u(8)
+
+        self.resize(width, height)
+        canvas = self.canvas
+        canvas.delete('all')
+        locked = bool(self.opt('hud_locked'))
+        border = T.LINE_STRONG if locked else T.ACCENT
+        round_rect(canvas, 0.5, 0.5, width - 0.5, height - 0.5, self.u(13),
+                   T.SURFACE, border)
+        if not locked:
+            round_rect(canvas, self.u(3), self.u(3), width - self.u(3), height - self.u(3),
+                       self.u(10), '', T.ACCENT_DEEP, 1)
+            for index in range(3):
+                dot_y = height / 2 - self.u(5) + index * self.u(5)
+                canvas.create_oval(self.u(5.5), dot_y, self.u(8), dot_y + self.u(2.5),
+                                   fill=T.ACCENT, outline='')
+
+        draw_icon(canvas, 'chest', chest_cx, centre, icon_box, squad_tone,
+                  width=max(1.0, icon_box / 11.0))
+        canvas.create_text(squad_x, centre, text=squad_text, anchor='w',
+                           fill=squad_tone, font=self.fnt(25, 'bold'))
+        canvas.create_text(squad_x, self.u(43), text='SQUAD', anchor='w',
+                           fill=T.MUTE, font=self.fnt(9, 'bold'))
+        canvas.create_line(divider_x, self.u(16), divider_x, self.u(44),
+                           fill=T.LINE, width=1)
+        draw_icon(canvas, 'user', user_cx, centre, user_box, personal_tone,
+                  width=max(1.0, user_box / 11.0))
+        canvas.create_text(personal_x, centre, text=personal_text, anchor='w',
+                           fill=personal_tone, font=self.fnt(18, 'bold'))
+        canvas.create_text(personal_x, self.u(43), text='DU', anchor='w',
+                           fill=T.MUTE, font=self.fnt(9, 'bold'))
+        radius = self.u(4)
+        dot_x, dot_y = width - self.u(13), self.u(13)
+        canvas.create_oval(dot_x - radius - 1, dot_y - radius - 1,
+                           dot_x + radius + 1, dot_y + radius + 1,
+                           outline=mix(T.SURFACE, status_tone, .35), width=1)
+        canvas.create_oval(dot_x - radius, dot_y - radius, dot_x + radius, dot_y + radius,
+                           fill=status_tone, outline='')
+
+        if self.opt('hud_mode') == 'expanded':
+            top = self.u(self.HEAD_H)
+            canvas.create_line(self.u(12), top, width - self.u(12), top,
+                               fill=T.LINE_SOFT, width=1)
+            top += self.u(4)
+            if not members:
+                canvas.create_text(width / 2, top + self.u(self.ROW_H) / 2,
+                                   text='Keine aktive Runde', fill=T.MUTE,
+                                   font=self.fnt(11))
+            for index, member in enumerate(members):
+                row_y = top + index * self.u(self.ROW_H) + self.u(self.ROW_H) / 2
+                tone = T.OK if member['confirmed'] else (
+                    T.CYAN if member['online'] else T.MUTE)
+                mark = self.u(3.5)
+                canvas.create_oval(self.u(18) - mark, row_y - mark,
+                                   self.u(18) + mark, row_y + mark,
+                                   fill=tone, outline='')
+                canvas.create_text(self.u(30), row_y, text=str(member['name'])[:14],
+                                   anchor='w', fill=T.DIM, font=self.fnt(11))
+                canvas.create_text(width - self.u(28), row_y, text=str(member['value']),
+                                   anchor='e', fill=tone, font=self.fnt(12, 'bold'))
+                draw_icon(canvas, 'check' if member['confirmed'] else 'bolt',
+                          width - self.u(15), row_y, self.u(9), tone, width=1.2)
+
+    def resize(self, width, height):
+        if (width, height) == self._size:
+            return
+        self._size = (width, height)
+        stored_x, stored_y = self.opt('hud_x'), self.opt('hud_y')
+        if stored_x is None or stored_y is None:
+            x, y = self.default_position(width, height)
+        else:
+            x, y = self.clamp(int(stored_x), int(stored_y), width, height)
+        self.win.geometry(f'{width}x{height}+{x}+{y}')
+        self.canvas.configure(width=width, height=height)
+
+
+# --------------------------------------------------------------------------
 # Application shell
 # --------------------------------------------------------------------------
 NAV = (
@@ -1035,9 +1751,12 @@ class Gui:
             pass
 
         self.events = queue.Queue()
-        self.overlay = None
-        self.overlay_var = None
+        self.hud = Hud(self.root, self.core, on_change=self.sync_hud_controls)
+        self.hotkeys = None
+        self.hotkey_note = ''
+        self.hud_fields = {}
         self.vision = None
+        self.visual_bridge = VisualCounterBridge(self.core)
         self.update_busy = False
         self.update_pending = False
         self.pending_version = ''
@@ -1060,6 +1779,9 @@ class Gui:
         self.root.bind('<Map>', lambda e: setattr(self, '_idle', False))
         self.root.after(500, self.refresh)
         self.root.after(9_000, self.periodic_update_check)
+        self.start_hotkeys()
+        if self.hud.opt('hud_enabled'):
+            self.root.after(250, self.restore_hud)
         if all(self.core.config.get(k) for k in ('server_url', 'token', 'name')):
             self.root.after(300, self.connect_automatically)
 
@@ -1419,7 +2141,7 @@ class Gui:
         quick = (
             ('Neue Squad-Runde', self.start_round, 'spark'),
             ('Replay auswerten', self.run_chestcounter, 'film'),
-            ('Live-HUD', self.toggle_overlay, 'target'),
+            ('In-Game-HUD', self.toggle_overlay, 'layout'),
             ('Web-Dashboard', self.open_dashboard, 'external'),
         )
         for i, (title, callback, icon) in enumerate(quick):
@@ -1556,6 +2278,48 @@ class Gui:
               'verlassen deinen PC nie.',
               11, fg=T.MUTE, bg=T.SURFACE, anchor='w', justify='left',
               wraplength=px(340)).pack(fill='x', pady=(px(8), 0))
+
+        visual = Card(page)
+        visual.pack(fill='x', pady=(T.S4, 0))
+        visual_head = section_head(
+            visual.body, 'Visueller Kistenzähler · Live-Test',
+            'Optionaler Test mit Fortnite Visual Chest Counter v0.2.3.')
+        Pill(visual_head, 'EXPERIMENTELL', T.WARN, T.TINT_WARN, dot=False,
+             bg=T.SURFACE).pack(side='right')
+        label(visual.body,
+              'Die andere Anwendung erkennt CHEST-XP-Popups im Spielbild. '
+              'SquadLoot liest nur deren kleine OBS-Zählerdateien. '
+              'Es wird KEIN zweiter Bildschirm-Scan durch SquadLoot gestartet.',
+              11, fg=T.DIM, bg=T.SURFACE, anchor='w', justify='left',
+              wraplength=px(810)).pack(fill='x', pady=(0, T.S3))
+        self.visual_path_label = tk.StringVar(
+            value=self.visual_folder_caption())
+        tk.Label(visual.body, textvariable=self.visual_path_label, bg=T.SURFACE,
+                 fg=T.DIM, font=font(11), anchor='w', justify='left',
+                 wraplength=px(810)).pack(fill='x')
+        actions = tk.Frame(visual.body, bg=T.SURFACE)
+        actions.pack(fill='x', pady=(T.S3, T.S3))
+        Button(actions, 'OBS-Ordner wählen', self.select_visual_folder, 'secondary',
+               icon='folder', bg=T.SURFACE).pack(side='left')
+        self.visual_button = Button(actions, 'Live-Test starten', self.toggle_visual_bridge,
+                                    'primary', icon='play', bg=T.SURFACE)
+        self.visual_button.pack(side='left', padx=(px(6), 0))
+        self.visual_status = Pill(visual.body, 'Test ausgeschaltet', T.MUTE,
+                                  T.SURFACE_2, bg=T.SURFACE)
+        self.visual_status.pack(anchor='w')
+        self.visual_info = tk.StringVar(
+            value='Erst Fortnite Visual Chest Counter starten und den '
+                  'OBS-Ordner wählen. Standardmäßig werden keine Werte übernommen.')
+        tk.Label(visual.body, textvariable=self.visual_info, bg=T.SURFACE,
+                 fg=T.MUTE, font=font(11), anchor='w', justify='left',
+                 wraplength=px(810)).pack(fill='x', pady=(T.S3, 0))
+        label(visual.body,
+              'APPROX ist die geschätzte Gesamtzahl und enthält CERTAIN bereits. '
+              'SquadLoot addiert sie deshalb NICHT. Alte Zählerstände werden beim '
+              'Start und bei jeder neuen Runde als Ausgangswert genommen. '
+              'Nach dem Match ersetzt das Replay die Schätzung.',
+              11, fg=T.MUTE, bg=T.SURFACE, anchor='w', justify='left',
+              wraplength=px(810)).pack(fill='x', pady=(px(8), 0))
 
         legend = Card(page)
         legend.pack(fill='x', pady=(T.S4, 0))
@@ -1815,6 +2579,8 @@ class Gui:
         Button(row, 'Zur Live-Erkennung', lambda: self.show_page('live'), 'ghost',
                bg=T.SURFACE).pack(side='left', padx=(px(6), 0))
 
+        self.build_hud_settings(page)
+
         body = self.settings_section(
             page, 'Updates', 'Neue Versionen kommen ausschließlich von deinem Pi.',
             'download', T.CYAN, T.TINT_CYAN)
@@ -1836,6 +2602,99 @@ class Gui:
         tk.Label(actions.body, textvariable=self.settings_note, bg=T.SURFACE, fg=T.MUTE,
                  font=font(11), anchor='w', justify='left').pack(fill='x',
                                                                  pady=(T.S3, 0))
+
+    def build_hud_settings(self, page):
+        """Overlay configuration: visibility, mode, opacity, scale, lock, keys."""
+        body = self.settings_section(
+            page, 'In-Game-HUD', 'Kleines Overlay über Fortnite — nur die Zahlen, '
+            'kein zweites Fenster. Für Vollbild im Fenstermodus spielen.',
+            'layout', T.ACCENT, T.TINT_ACCENT)
+
+        switches = tk.Frame(body, bg=T.SURFACE)
+        switches.pack(fill='x')
+        self.hud_toggle = Toggle(switches, 'HUD anzeigen', self.hud.visible,
+                                 self.hud.set_enabled, bg=T.SURFACE)
+        self.hud_toggle.pack(anchor='w')
+        self.hud_expanded = Toggle(
+            switches, 'Erweitert: Spieler einzeln anzeigen',
+            self.hud.opt('hud_mode') == 'expanded',
+            lambda value: self.hud.set_mode('expanded' if value else 'compact'),
+            bg=T.SURFACE)
+        self.hud_expanded.pack(anchor='w', pady=(T.S3, 0))
+        self.hud_lock = Toggle(
+            switches, 'Position gesperrt (Klicks gehen ins Spiel)',
+            bool(self.hud.opt('hud_locked')), self.hud.set_locked, bg=T.SURFACE)
+        self.hud_lock.pack(anchor='w', pady=(T.S3, 0))
+
+        sliders = tk.Frame(body, bg=T.SURFACE)
+        sliders.pack(fill='x', pady=(T.S4, 0))
+        sliders.grid_columnconfigure(1, weight=1)
+        self.hud_opacity_var = tk.StringVar()
+        self.hud_scale_var = tk.StringVar()
+
+        def opacity_changed(value):
+            self.hud_opacity_var.set(f'{value * 100:.0f} %')
+            self.core.config['hud_opacity'] = round(float(value), 2)
+            self.hud.apply_opacity()
+
+        def scale_changed(value):
+            self.hud_scale_var.set(f'{value * 100:.0f} %')
+            self.core.config['hud_scale'] = round(float(value), 2)
+            self.hud.redraw(force=True)
+
+        rows = (
+            ('Deckkraft', 'hud_opacity', 0.35, 1.0, 0.01, opacity_changed,
+             self.hud_opacity_var),
+            ('Größe', 'hud_scale', 0.8, 1.6, 0.05, scale_changed, self.hud_scale_var),
+        )
+        for index, (title, key, low, high, step, handler, var) in enumerate(rows):
+            label(sliders, title, 12, fg=T.DIM, bg=T.SURFACE, anchor='w',
+                  width=10).grid(row=index, column=0, sticky='w', pady=px(4))
+            slider = Slider(sliders, self.hud.opt(key), low, high, step,
+                            command=handler,
+                            commit=lambda value, k=key: self.core.set_config({k: round(float(value), 2)}),
+                            bg=T.SURFACE)
+            slider.grid(row=index, column=1, sticky='ew', padx=T.S3, pady=px(4))
+            tk.Label(sliders, textvariable=var, bg=T.SURFACE, fg=T.TEXT,
+                     font=font(12, 'bold'), width=6, anchor='e').grid(
+                         row=index, column=2, sticky='e')
+            handler(slider.get())
+
+        actions = tk.Frame(body, bg=T.SURFACE)
+        actions.pack(fill='x', pady=(T.S4, 0))
+        Button(actions, 'Position zurücksetzen', self.hud.reset_position, 'secondary',
+               icon='refresh', bg=T.SURFACE).pack(side='left')
+        Button(actions, 'Vorschau', self.preview_hud, 'ghost', icon='eye',
+               bg=T.SURFACE).pack(side='left', padx=(px(6), 0))
+
+        divider(body)
+        label(body, 'Globale Tastenkürzel (optional)', 12, 'bold', fg=T.DIM,
+              bg=T.SURFACE, anchor='w').pack(fill='x', pady=(0, T.S3))
+        for key, title, hint in (
+                ('hud_hotkey_toggle', 'HUD anzeigen / ausblenden',
+                 'Leer lassen deaktiviert das Kürzel. Mindestens Strg, Alt oder Shift.'),
+                ('hud_hotkey_lock', 'Sperren / entsperren',
+                 'Zum Verschieben kurz entsperren.'),
+                ('hud_hotkey_mode', 'Kompakt / erweitert',
+                 'Wechselt zwischen beiden HUD-Modi.')):
+            field = Field(body, title, self.hud.opt(key), hint=hint)
+            field.pack(fill='x', pady=(0, T.S3))
+            self.hud_fields[key] = field
+        Button(body, 'Kürzel übernehmen', self.apply_hotkeys, 'secondary',
+               icon='check', bg=T.SURFACE).pack(anchor='w')
+
+        self.hud_note = tk.StringVar(value='')
+        tk.Label(body, textvariable=self.hud_note, bg=T.SURFACE, fg=T.MUTE,
+                 font=font(11), anchor='w', justify='left',
+                 wraplength=px(780)).pack(fill='x', pady=(T.S3, 0))
+        self.sync_hud_controls()
+
+    def preview_hud(self):
+        """Show the HUD briefly so the user can judge opacity and size."""
+        if not self.hud.visible:
+            self.hud.set_enabled(True)
+        else:
+            self.hud.redraw(force=True)
 
     def template_caption(self):
         path = self.core.config.get('vision_template', '')
@@ -2133,11 +2992,56 @@ class Gui:
         if messagebox.askyesno('Zähler zurücksetzen',
                                'Nur deine vorläufigen lokalen Zähler zurücksetzen?'):
             self.core.reset_local_counters()
+            self.visual_bridge.reset_baseline()
             self.set_status('Lokale Zähler zurückgesetzt.', T.DIM)
 
     def destroyed(self):
         self.core.adjust('manual', 1)
         self.core.adjust('destroyed', 1)
+
+    # ---- external visual chest counter (opt-in) ------------------------
+    def visual_folder_caption(self):
+        folder = self.core.config.get('visual_counter_dir', '')
+        return ('OBS-Ausgabe: ' + folder) if folder else \
+            'Noch kein OBS-Ausgabeordner gewählt.'
+
+    def select_visual_folder(self):
+        folder = filedialog.askdirectory(
+            title='Fortnite Visual Chest Counter: obs_output auswählen')
+        if folder:
+            self.core.set_config({'visual_counter_dir': folder})
+            self.visual_path_label.set(self.visual_folder_caption())
+            self.visual_info.set('Ordner gespeichert. Live-Test kann gestartet werden.')
+
+    def toggle_visual_bridge(self):
+        bridge = self.visual_bridge
+        if bridge.running:
+            bridge.stop()
+            self.visual_button.set_label('Live-Test starten', icon='play')
+            self.visual_status.set('Test ausgeschaltet', T.MUTE, T.SURFACE_2)
+            self.visual_info.set('Live-Test gestoppt. Bisherige Schätzwerte bleiben '
+                                 'bis zur nächsten Runde oder Replay-Bestätigung sichtbar.')
+            return
+        folder = self.core.config.get('visual_counter_dir', '')
+        try:
+            if not folder:
+                raise ValueError('Zuerst den obs_output-Ordner aus der '
+                                 'Fortnite-Visual-Chest-Counter-Installation wählen.')
+            # Never run both visual algorithms: they would double count.
+            if self.vision_running():
+                self.vision.stop_now()
+                self.vision_button.set_label('Erkennung starten', icon='play')
+                self.vision_state.set('Erkennung ist AUS', T.MUTE, T.SURFACE_2)
+                self.vision_meter.set(0)
+            bridge.start(folder)
+            self.visual_button.set_label('Live-Test stoppen', icon='stop')
+            self.visual_status.set('Live-Test aktiv', T.WARN, T.TINT_WARN)
+            self.visual_info.set('Startwerte ignoriert. Öffne jetzt eine Kiste '
+                                 'und beobachte APPROX / CERTAIN.')
+        except (ValueError, OSError) as exc:
+            self.visual_status.set('Nicht gestartet', T.BAD, T.TINT_BAD)
+            self.visual_info.set(str(exc))
+            messagebox.showwarning('Visueller Live-Test', str(exc))
 
     # ---- vision --------------------------------------------------------
     def select_vision_template(self):
@@ -2155,6 +3059,10 @@ class Gui:
         return bool(self.vision and self.vision.thread and self.vision.thread.is_alive())
 
     def toggle_vision(self):
+        if self.visual_bridge.running:
+            self.visual_bridge.stop()
+            self.visual_button.set_label('Live-Test starten', icon='play')
+            self.visual_status.set('Test ausgeschaltet', T.MUTE, T.SURFACE_2)
         if self.vision_running():
             self.vision.stop_now()
             self.vision_state.set('Erkennung ist AUS', T.MUTE, T.SURFACE_2)
@@ -2178,47 +3086,104 @@ class Gui:
             self.vision_detail.set(str(exc))
             messagebox.showwarning('Bildschirm-Erkennung', str(exc))
 
-    # ---- overlay HUD ---------------------------------------------------
+    # ---- in-game HUD ---------------------------------------------------
     def toggle_overlay(self):
-        if self.overlay is not None:
-            self.overlay.destroy()
-            self.overlay = None
-            self.overlay_var = None
+        """Quick action and menu entry; keeps the historic method name."""
+        self.hud.toggle()
+
+    def restore_hud(self):
+        """Bring the HUD back after a restart and mirror it into Settings."""
+        self.hud.show()
+        self.sync_hud_controls()
+
+    def start_hotkeys(self):
+        """(Re-)register the optional global shortcuts. Windows only."""
+        self.stop_hotkeys()
+        self.hotkey_note = ''
+        bindings = []
+        for name, key in (('toggle', 'hud_hotkey_toggle'), ('lock', 'hud_hotkey_lock'),
+                          ('mode', 'hud_hotkey_mode')):
+            try:
+                combo = parse_hotkey(self.hud.opt(key))
+            except ValueError as exc:
+                self.hotkey_note = str(exc)
+                continue
+            if combo:
+                bindings.append((name, combo))
+        if not bindings:
+            if not self.hotkey_note:
+                self.hotkey_note = 'Keine Tastenkürzel aktiv.'
+        elif not Win32.available:
+            # The platform caveat is already stated once in sync_hud_controls.
+            self.hotkey_note = f'{len(bindings)} Kürzel konfiguriert.'
+        else:
+            self.hotkeys = HotkeyListener(
+                bindings, lambda name: self.events.put(('hotkey', name)))
+            self.hotkeys.start()
+            self.hotkey_note = f'{len(bindings)} Tastenkürzel registriert.'
+        self.sync_hud_controls()
+
+    def stop_hotkeys(self):
+        if self.hotkeys is not None:
+            self.hotkeys.stop()
+            self.hotkeys = None
+
+    def apply_hotkeys(self):
+        values = {}
+        for key, field in self.hud_fields.items():
+            text = field.get()
+            try:
+                parse_hotkey(text)
+            except ValueError as exc:
+                field.mark('error', str(exc))
+                return
+            field.mark('ok' if text else 'idle',
+                       'Übernommen.' if text else None)
+            values[key] = text
+        self.core.set_config(values)
+        self.start_hotkeys()
+
+    def sync_hud_controls(self):
+        """Mirror the HUD state back into the settings panel."""
+        if not hasattr(self, 'hud_toggle'):
             return
-        win = tk.Toplevel(self.root)
-        self.overlay = win
-        win.title('SquadLoot HUD')
-        win.geometry(f'{px(330)}x{px(220)}+{px(40)}+{px(120)}')
-        win.configure(bg=T.BG)
-        win.attributes('-topmost', True)
-        win.resizable(False, False)
-        win.protocol('WM_DELETE_WINDOW', self.toggle_overlay)
-        card = Card(win, pad=T.S4)
-        card.pack(fill='both', expand=True, padx=T.S2, pady=T.S2)
-        head = tk.Frame(card.body, bg=T.SURFACE)
-        head.pack(fill='x')
-        mark = tk.Canvas(head, width=px(20), height=px(20), bg=T.SURFACE, bd=0,
-                         highlightthickness=0)
-        mark.pack(side='left')
-        draw_logo(mark, px(10), px(10), px(19))
-        label(head, 'SquadLoot HUD', 12, 'bold', bg=T.SURFACE).pack(side='left',
-                                                                     padx=(px(6), 0))
-        Pill(head, 'geschätzt', T.WARN, T.TINT_WARN, dot=False,
-             bg=T.SURFACE).pack(side='right')
-        self.overlay_var = tk.StringVar(value='Keine aktuelle Runde')
-        tk.Label(card.body, textvariable=self.overlay_var, bg=T.SURFACE, fg=T.TEXT,
-                 font=font(12), justify='left', anchor='nw').pack(fill='both',
-                                                                   expand=True,
-                                                                   pady=(T.S3, T.S3))
-        row = tk.Frame(card.body, bg=T.SURFACE)
-        row.pack(fill='x')
-        Button(row, 'Truhe', lambda: self.core.adjust('manual', 1), 'primary',
-               icon='plus', bg=T.SURFACE, small=True).pack(side='left')
-        Button(row, '', lambda: self.core.adjust('manual', -1), 'secondary',
-               icon='minus', width=T.BTN_H_SM, height=T.BTN_H_SM,
-               bg=T.SURFACE, small=True).pack(side='left', padx=px(5))
-        Button(row, 'Schließen', self.toggle_overlay, 'ghost', bg=T.SURFACE,
-               small=True).pack(side='right')
+        self.hud_toggle.set(self.hud.visible)
+        self.hud_expanded.set(self.hud.opt('hud_mode') == 'expanded')
+        self.hud_lock.set(bool(self.hud.opt('hud_locked')))
+        notes = []
+        if not Win32.available:
+            notes.append('Klick-durchlässig, Tool-Fenster und globale Kürzel sind '
+                         'Windows-Funktionen und bleiben auf diesem System ohne Wirkung.')
+        elif self.hud.opt('hud_locked'):
+            notes.append('Gesperrt: Mausklicks gehen durch das HUD ins Spiel.')
+        else:
+            notes.append('Entsperrt: HUD mit der Maus verschieben, Rechtsklick öffnet '
+                         'das Menü.')
+        if self.hud.overlaps_vision_region():
+            notes.append('Achtung: Das HUD liegt im Bereich, den die '
+                         'Bildschirmerkennung abtastet. Bitte an den Rand ziehen.')
+        if self.hotkey_note:
+            notes.append(self.hotkey_note)
+        if self.hotkeys is not None and self.hotkeys.error:
+            notes.append(self.hotkeys.error)
+        self.hud_note.set('  ·  '.join(notes))
+
+    def hud_snapshot(self, members, squad_total, personal, own_verified,
+                     current, connected, totals, failing):
+        rows = []
+        for member in members[:4]:
+            verified = member.get('verified_chests')
+            rows.append({'name': member.get('name', 'Spieler'),
+                         'value': verified if verified is not None
+                         else member.get('live_chests', 0),
+                         'confirmed': verified is not None,
+                         'online': bool(member.get('online'))})
+        return {'squad': squad_total,
+                'personal': own_verified if own_verified is not None else personal,
+                'round': current, 'connected': connected,
+                'confirmed': totals['confirmed'], 'estimated': totals['estimated'],
+                'members': rows, 'personal_confirmed': own_verified is not None,
+                'error': failing}
 
     # ---- live refresh --------------------------------------------------
     def set_status(self, message, tone=T.DIM):
@@ -2228,6 +3193,8 @@ class Gui:
 
     def refresh(self):
         self._tick += 1
+        if self.visual_bridge.running:
+            self.visual_bridge.poll()
         events = []
         while not self.events.empty():
             events.append(self.events.get_nowait())
@@ -2298,9 +3265,11 @@ class Gui:
         self.live_tiles['ammo'].set(ammo)
         self.live_tiles['food'].set(food)
         running = self.vision_running()
+        external_running = self.visual_bridge.running
         if current:
-            tracking = ('Live + Bildschirm (Beta)' if running else 'Live-Tracking aktiv')
-            tone, tint = (T.WARN, T.TINT_WARN) if running else (T.CYAN, T.TINT_CYAN)
+            tracking = ('Live + Visual Counter (Beta)' if external_running else
+                        ('Live + Bildschirm (Beta)' if running else 'Live-Tracking aktiv'))
+            tone, tint = (T.WARN, T.TINT_WARN) if (running or external_running) else (T.CYAN, T.TINT_CYAN)
         else:
             tracking, tone, tint = 'Tracking inaktiv', T.MUTE, T.SURFACE_2
         self.live_state.set(tracking, tone, tint)
@@ -2311,6 +3280,19 @@ class Gui:
             f'Runde #{current} · {len(members)} Spieler · Squad {squad_total} Truhen'
             if current else 'Starte ein Match oder eine neue Squad-Runde.')
         self.update_vision_panel(running)
+        if self.visual_bridge.running:
+            bridge = self.visual_bridge
+            if bridge.error:
+                self.visual_status.set('Fehler beim Lesen', T.BAD, T.TINT_BAD)
+                self.visual_info.set(bridge.error)
+            else:
+                self.visual_status.set('Visuell aktiv · geschätzt', T.WARN, T.TINT_WARN)
+                self.visual_info.set(
+                    f'{bridge.state} · {bridge.estimated} APPROX / '
+                    f'{bridge.certain} CERTAIN in dieser Runde · '
+                    'letzter Fund: ' +
+                    ago(None if bridge.last_event_at is None else
+                        time.monotonic() - bridge.last_event_at))
 
         # -- history / squad ----------------------------------------------
         self.history_stats['matches'].set(data.get('total_matches', 0))
@@ -2324,14 +3306,10 @@ class Gui:
                             total=squad_total)
         self.render_accounts(accounts)
 
-        # -- overlay ------------------------------------------------------
-        if self.overlay is not None and self.overlay_var is not None:
-            lines = [f'Squad    {squad_total} Truhen', f'Du       {personal}']
-            for member in members[:4]:
-                verified = member.get('verified_chests')
-                value = verified if verified is not None else member.get('live_chests', 0)
-                lines.append(f"{str(member.get('name', 'Spieler'))[:12]:<12} {value}")
-            self.overlay_var.set('\n'.join(lines))
+        # -- in-game HUD --------------------------------------------------
+        self.hud.update(self.hud_snapshot(members, squad_total, personal, own_verified,
+                                          current, connected, totals,
+                                          status.startswith('Fehler')))
 
         # -- updates ------------------------------------------------------
         self.lastcheck_var.set(ago(None if self.last_check is None
@@ -2383,6 +3361,13 @@ class Gui:
                 self.set_status('Fehler: ' + message[:220], T.BAD)
             elif kind == 'info':
                 self.set_status(message, T.OK)
+            elif kind == 'hotkey':
+                if message == 'toggle':
+                    self.hud.toggle()
+                elif message == 'lock':
+                    self.hud.toggle_lock()
+                elif message == 'mode':
+                    self.hud.toggle_mode()
             elif kind == 'conn_ok':
                 self.conn_test.set('erreichbar · ' + message, T.OK, T.TINT_OK)
                 self.settings_note.set('Server antwortet. Jetzt speichern und verbinden.')
@@ -2423,8 +3408,11 @@ class Gui:
 
     # ---- lifecycle -----------------------------------------------------
     def close(self):
+        self.visual_bridge.stop()
         if self.vision:
             self.vision.stop_now()
+        self.stop_hotkeys()
+        self.hud.hide()
         self.core.shutdown()
         try:
             self.root.destroy()

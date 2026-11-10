@@ -679,6 +679,8 @@ def _managed_fetch(url, expected_sha, expected_size, destination, progress=None)
         raise
 
 
+_LOOT_WORKER_SOURCE = "# SquadLoot HUD popup classification. Runs inside the already active visual worker.\n# Only compact pixel masks of the category words (no gameplay images).\n# See docs/LIVE-VALIDATION-1.5.6.md for limitations and release gates.\nimport base64\nimport zlib\nimport numpy as np\nfrom scipy.ndimage import gaussian_filter\nfrom scipy.signal import fftconvolve\n\n_WORDS = {\n    'chest': ((11, 34), 'eNqFT4ENACAIwv+frjSVLBdb6pIJAH/IxKr6RAGq1IjRrKLFQR+eDHEHm2p/xcB5DCyd9pEZbItbnVN6FJJ0fhuWTAI81NUAjlEAxQ=='),\n    'ammo': ((11, 62), 'eNqlUdESwCAIgv//6V0zCKu3dieRi1MReP1ICjcYSL0pRv2oWHcWXVAaiyKjQDy8wKygWs78HD7vahxqc+5qd2WW88eopcKpDsZD3Uzt+Vmtsd44Y+xNrS5iQhuLZpbCbcBrDbaW3BeGMMS2Xlhe2c5BgQ/QowFp'),\n    'food': ((11, 75), 'eNqtUlsOgDAIa+9/abMprO3mh4kkG1JYeQn8KCTnNdT9MZT6K4oZ1d7CNGoz5wm0My/ckHrz6LPZFZj78SUVEOiJKqLBIoeWCdXShLSluZ1qSW/gVKsMO6OFSit4nRF9a7GYarCf+9k3ZFR70nDSU1Iqopk2ApBE/IqU+6tceB0BlA=='),\n}\n_THRESHOLDS = {'chest': 0.90, 'ammo': 0.93, 'food': 0.93}\n\ndef _template_data():\n    result = {}\n    for kind, (shape, packed) in _WORDS.items():\n        data = zlib.decompress(base64.b64decode(packed))\n        pixels = np.frombuffer(data, dtype=np.uint8).reshape(shape)\n        tpl = gaussian_filter(pixels.astype(np.float64), 0.6)\n        result[kind] = (tpl, float(np.sum(tpl * tpl)))\n    return result\n\ndef _window_squares(img, h, w):\n    squares = img * img\n    sat = np.pad(squares, ((1, 0), (1, 0))).cumsum(0).cumsum(1)\n    return (sat[h:, w:] - sat[:-h, w:] -\n            sat[h:, :-w] + sat[:-h, :-w])\n\nclass LootPopupDetector:\n    \"\"\"One pass on an existing 720p RGB frame; no second screen capture or OCR.\n\n    CHEST is a competing label only: the upstream detector owns chest counts.\n    No destruction is guessed from pixels; replay is authoritative for that.\n    \"\"\"\n\n    def __init__(self):\n        self.templates = _template_data()\n        self.active = {kind: False for kind in self.templates}\n        self.hits = {kind: 0 for kind in self.templates}\n        self.last_present = {kind: -1000000.0 for kind in self.templates}\n        self.last_event = {kind: -1000000.0 for kind in self.templates}\n\n    def _scores(self, frame_rgb):\n        if frame_rgb.shape != (720, 1280, 3):\n            raise ValueError('Expected 1280x720 RGB from visual worker')\n        rgb = frame_rgb[180:290, 760:1010].astype(np.int16)\n        bright = np.minimum(rgb[:, :, 0], rgb[:, :, 2])\n        mask = ((bright > 170) & (rgb[:, :, 1] < bright - 8))\n        if np.count_nonzero(mask) < 18:\n            return {}\n        smooth = gaussian_filter(mask.astype(np.float64), 0.6)\n        scores = {}\n        for kind, (tpl, energy) in self.templates.items():\n            height, width = tpl.shape\n            numerator = fftconvolve(smooth, tpl[::-1, ::-1], mode='valid')\n            den = _window_squares(smooth, height, width)\n            corr = numerator / np.sqrt(np.maximum(den * energy, 1e-8))\n            scores[kind] = float(np.clip(corr.max(), 0, 1))\n        return scores\n\n    def update(self, t, frame_rgb):\n        scores = self._scores(frame_rgb)\n        scores = {k: scores.get(k, 0.0) for k in self.templates}\n        ranked = sorted(scores, key=scores.get, reverse=True)\n        winner = ranked[0]\n        runner_up = scores[ranked[1]]\n        result = []\n        for kind in self.templates:\n            score = scores[kind]\n            plausible = (kind == winner and score >= _THRESHOLDS[kind]\n                         and score - runner_up >= 0.055)\n            if plausible:\n                self.last_present[kind] = t\n                self.hits[kind] += 1\n                # Two successive processed frames, plus a cooldown for animated\n                # popup fades (verified on the supplied Produce Box sample).\n                if (not self.active[kind] and self.hits[kind] >= 2\n                        and t - self.last_event[kind] >= 3.0):\n                    self.active[kind] = True\n                    self.last_event[kind] = t\n                    if kind in ('ammo', 'food'):\n                        result.append((kind, round(score, 3)))\n            else:\n                self.hits[kind] = 0\n                if t - self.last_present[kind] >= 0.45:\n                    self.active[kind] = False\n        return result\n"
+
 class ManagedComponentStore:
     """Background-installable private runtimes; no changes to updater's file list."""
 
@@ -815,6 +817,65 @@ class ManagedComponentStore:
         obs.mkdir(parents=True, exist_ok=True)
         install_german_visual_template(obs, matrix)
         return True
+
+
+    def install_loot_popup(self):
+        """Safely extend ONLY the pinned v0.2.3 worker with English loot labels.
+
+        The code uses the worker's already captured frame and NumPy/SciPy.
+        It never records, uploads or imports a player's gameplay footage.
+        Source changes require invalidating upstream UNCHECKED_HASH bytecode.
+        """
+        package = self.visual_root() / 'runtime/lib/fortnite_chest_counter'
+        counter = package / 'counter.py'
+        module = package / 'squadloot_loot_popup.py'
+        original = counter.read_text(encoding='utf-8')
+        marker = '# SquadLootLootPopupsV1'
+        before_loop = '    try:\n        for t, frame in source.frames():\n'
+        after_process = '            applied = session.apply(est.process_frame(t, frame), t)\n'
+        patch_init = (
+            '    ' + marker + '\n'
+            '    squadloot_loot = None\n'
+            '    if "en" in cfg["detector"]["languages"]:\n'
+            '        try:\n'
+            '            from fortnite_chest_counter.squadloot_loot_popup import LootPopupDetector\n'
+            '            squadloot_loot = LootPopupDetector()\n'
+            '        except Exception as error:\n'
+            '            CONSOLE.warn("SquadLoot loot detector unavailable: " + str(error))\n'
+        )
+        patch_frame = (
+            '            if squadloot_loot is not None:\n'
+            '                try:\n'
+            '                    for sq_kind, sq_score in squadloot_loot.update(t, frame):\n'
+            '                        CONSOLE.emit("squadloot_loot", kind=sq_kind, confidence=sq_score)\n'
+            '                except Exception as error:\n'
+            '                    CONSOLE.warn("SquadLoot loot detector disabled: " + str(error))\n'
+            '                    squadloot_loot = None\n'
+        )
+        changed = False
+        if original.count(marker) == 0:
+            if original.count(before_loop) != 1 or original.count(after_process) != 1:
+                raise RuntimeError('Unbekannter Counter-Code: '
+                                   'Loot-Erweiterung nicht installiert.')
+            updated = original.replace(before_loop, patch_init + before_loop, 1)
+            updated = updated.replace(after_process, after_process + patch_frame, 1)
+            compile(updated, str(counter), 'exec')
+            backup = counter.with_name('counter.py.squadloot-original')
+            if backup.exists():
+                raise RuntimeError('Ein altes Counter-Backup ist bereits vorhanden.')
+            _german_atomic_write(backup, original.encode('utf-8'))
+            changed = True
+        elif original.count(marker) == 1 and 'squadloot_loot.update(t, frame)' in original:
+            updated = original
+        else:
+            raise RuntimeError('Unvollständiger unbekannter Loot-Patch gefunden.')
+        compile(_LOOT_WORKER_SOURCE, str(module), 'exec')
+        _german_atomic_write(module, _LOOT_WORKER_SOURCE.encode('utf-8'))
+        if changed:
+            _german_atomic_write(counter, updated.encode('utf-8'))
+        _invalidate_unchecked_bytecode(counter)
+        _invalidate_unchecked_bytecode(module)
+        return changed
 
     def tune_visual_capture(self):
         """Reduce gdigrab's raw capture rate to the detector's FPS.
@@ -1221,6 +1282,22 @@ class ManagedLiveEngine:
             self.certain = max(self.certain, certain)
             return bool(delta)
 
+    def feed_loot_message(self, event):
+        """Only trusted, English popup labels increment live ammo/food totals."""
+        if not isinstance(event, dict) or event.get('type') != 'squadloot_loot':
+            return False
+        kind = event.get('kind')
+        score = event.get('confidence')
+        if (kind not in ('ammo', 'food') or type(score) not in (int, float)
+                or not 0.90 <= score <= 1.0
+                or self.core.config.get('live_language', 'en') != 'en'):
+            return False
+        self.core.adjust(kind, 1)
+        if hasattr(self.core, 'live_wake'):
+            self.core.live_wake.set()
+        self.last_event_at = time.monotonic()
+        return True
+
     def start(self):
         if self.running:
             return
@@ -1262,6 +1339,11 @@ class ManagedLiveEngine:
                 self.store.tune_visual_capture()
             except (OSError, RuntimeError, SyntaxError, AttributeError) as exc:
                 self.warning = ('Capture-Optimierung nicht aktiv: ' + str(exc)[:100])
+            try:
+                self.store.install_loot_popup()
+            except (OSError, RuntimeError, SyntaxError, ValueError) as exc:
+                self.warning = (self.warning + ' | ' if self.warning else '') + (
+                    'Weitere Loot-Arten noch nicht aktiv: ' + str(exc)[:100])
             lang = self.core.config.get('live_language', 'en')
             if lang == 'de' and not self.store.german_available():
                 raise RuntimeError('Deutsch benötigt ein echtes TRUHE-Popup-Muster. '
@@ -1334,6 +1416,8 @@ class ManagedLiveEngine:
                         if kind == 'event' and event.get('verdict') == 'rejected':
                             if event.get('generic'):
                                 self.last_candidate = 'Interaktion erkannt – Art noch unbestimmt'
+                    elif kind == 'squadloot_loot':
+                        self.feed_loot_message(event)
                     elif kind == 'types':
                         breakdown = event.get('breakdown')
                         if isinstance(breakdown, dict):

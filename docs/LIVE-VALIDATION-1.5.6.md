@@ -80,3 +80,38 @@
 **Datenschutz:** Gameplay-Clips enthalten eventuell Bildschirmdaten.
 Sie bleiben lokal, werden nie automatisch an den Server geschickt und
 sollten nur nach freiwilliger, bewusster Prüfung geteilt werden.
+
+
+## Annotated real Fortnite footage received (10 Nov 2026)
+
+The owner supplied three local-only archives containing 13 marked, 1280x720,
+10-FPS, English-language clips (18 seconds each): six opened chests,
+four ammo boxes, two destroyed chests and one produce box. Do NOT add these
+recordings, screenshots, account data, usernames or ZIPs to this public repo.
+
+The visual XP feed in this session exposed \`CHEST\`, \`AMMO BOX\` and
+\`PRODUCE BOX\` category words. Destroyed chests did not consistently expose
+an equivalent XP text. Overlapping clips contain additional legitimate events,
+so counting clip files as independent actions would be incorrect.
+
+The experimental worker-only category classifier uses tiny extracted glyph
+patterns (no gameplay screenshots), already-captured RGB frames and the
+NumPy/SciPy installed with the pinned visual runtime. It does not add OCR,
+capture processes, network uploads or OpenCV. It emits only "ammo" and
+"food" events; upstream owns chest counts, and destroyed remains
+replay-confirmed.
+
+Offline clip smoke check on that one English session, at 10 FPS:
+- All four manually marked ammo-box events showed an ammo detection.
+- The one marked produce-box event showed a produce detection.
+- Duplicated produce detection during popup animation was suppressed by
+  a conservative 3-second same-category cooldown.
+- Other ammo events appeared in overlapping clips (valid XP popups, not
+  assessed as independent manual labels).
+- No true negative, diverse-HUD, full-session or German recall/precision
+  estimate is supported by these few clips.
+
+**NOT RELEASE READY**: verify desktop FPS impact on actual Fortnite clients;
+multiple HUD scales, screen resolutions, PC hardware, additional sessions and
+German category popups; exclude false positives and confirm server/live/replay
+reconciliation. Do not infer chest destruction live from ambiguous pixels.

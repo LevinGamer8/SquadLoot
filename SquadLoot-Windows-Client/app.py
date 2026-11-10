@@ -32,7 +32,9 @@ from tkinter import filedialog, font as tkfont, messagebox
 from client_core import (Core, CONFIG, chestcounter_exe, read_json, sync_once,
                          validate_url)
 from update_manager import current_version, check_and_stage, log_error
-from vision import VisionDetector, VisualCounterBridge
+from vision import (VisionDetector, VisualCounterBridge, german_visual_counter_root,
+                    normalized_german_screenshot, german_word_mask,
+                    install_german_visual_template, restore_german_visual_template)
 
 # --------------------------------------------------------------------------
 # Display scaling
@@ -2348,6 +2350,19 @@ class Gui:
         self.visual_button = Button(actions, 'Live-Test starten', self.toggle_visual_bridge,
                                     'primary', icon='play', bg=T.SURFACE)
         self.visual_button.pack(side='left', padx=(px(6), 0))
+        de_actions = tk.Frame(visual.body, bg=T.SURFACE)
+        de_actions.pack(fill='x', pady=(0, T.S3))
+        Button(de_actions, 'Deutsch kalibrieren', self.calibrate_visual_german,
+               'secondary', icon='target', bg=T.SURFACE).pack(side='left')
+        Button(de_actions, 'Deutsch zurücksetzen', self.restore_visual_german,
+               'ghost', icon='refresh', bg=T.SURFACE).pack(
+                   side='left', padx=(px(6), 0))
+        label(visual.body,
+              'Deutsch (Beta): Einmal ein echtes deutsches Truhen-XP-Popup '
+              'als Screenshot auswählen und das Truhenwort markieren. '
+              'Der externe Visual Chest Counter muss dabei geschlossen sein.',
+              11, fg=T.MUTE, bg=T.SURFACE, anchor='w', justify='left',
+              wraplength=px(810)).pack(fill='x', pady=(0, T.S3))
         self.visual_status = Pill(visual.body, 'Test ausgeschaltet', T.MUTE,
                                   T.SURFACE_2, bg=T.SURFACE)
         self.visual_status.pack(anchor='w')
@@ -3084,6 +3099,159 @@ class Gui:
             self.core.set_config({'visual_counter_dir': folder})
             self.visual_path_label.set(self.visual_folder_caption())
             self.visual_info.set('Ordner gespeichert. Live-Test kann gestartet werden.')
+
+
+    def calibrate_visual_german(self):
+        """Explicit, local one-time training of the external detector from a REAL popup."""
+        folder = self.core.config.get('visual_counter_dir', '')
+        try:
+            german_visual_counter_root(folder)
+        except (ValueError, OSError) as exc:
+            messagebox.showwarning('Deutsch-Kalibrierung', str(exc))
+            return
+        if self.visual_bridge.running:
+            messagebox.showwarning('Deutsch-Kalibrierung',
+                                   'Bitte zuerst den SquadLoot Live-Test stoppen.')
+            return
+        if not messagebox.askyesno(
+                'Visual Chest Counter geschlossen?',
+                'Bitte den EXTERNEN Fortnite Visual Chest Counter vollständig '
+                'beenden (auch seine Zählung), bevor seine Erkennungsdateien '
+                'angepasst werden. Die Originaldateien werden gesichert. '
+                'Ist er geschlossen?'):
+            return
+        screenshot = filedialog.askopenfilename(
+            title='Screenshot mit deutschem Truhen-XP-Popup auswählen',
+            filetypes=[('Fortnite-Screenshot', '*.png *.jpg *.jpeg *.webp *.bmp'),
+                       ('Alle Dateien', '*.*')])
+        if not screenshot:
+            return
+        import tempfile
+        try:
+            with tempfile.TemporaryDirectory(prefix='squadloot-de-') as temp:
+                normalized = normalized_german_screenshot(
+                    folder, screenshot, Path(temp) / 'fortnite-1280x720.png')
+                image = tk.PhotoImage(file=str(normalized))
+                self._german_select_word(folder, image)
+        except (OSError, ValueError, subprocess.SubprocessError, tk.TclError) as exc:
+            messagebox.showerror('Deutsch-Kalibrierung', str(exc)[:350],
+                                 parent=self.root)
+
+    def _german_select_word(self, folder, image):
+        win = tk.Toplevel(self.root)
+        win.title('SquadLoot · Deutsches Truhenwort auswählen')
+        win.configure(bg=T.BG)
+        win.geometry(f'{min(1350, self.root.winfo_screenwidth()-70)}x'
+                     f'{min(890, self.root.winfo_screenheight()-100)}')
+        tk.Label(win,
+                 text='Markiere NUR das violette Wort für eine geöffnete '
+                      'Truhe (z. B. TRUHE), NICHT +XP oder die ganze Zeile. '
+                      'Ziehe dafür ein kleines Rechteck mit der Maus.',
+                 bg=T.BG, fg=T.TEXT, font=font(12), anchor='w', justify='left',
+                 wraplength=px(1150)).pack(fill='x', padx=px(18), pady=px(12))
+        frame = tk.Frame(win, bg=T.BG)
+        frame.pack(fill='both', expand=True, padx=px(14))
+        xbar = tk.Scrollbar(frame, orient='horizontal')
+        ybar = tk.Scrollbar(frame, orient='vertical')
+        canvas = tk.Canvas(frame, width=1280, height=720, bg='#060913',
+                           scrollregion=(0, 0, 1280, 720),
+                           xscrollcommand=xbar.set, yscrollcommand=ybar.set,
+                           highlightthickness=0, borderwidth=0)
+        xbar.config(command=canvas.xview)
+        ybar.config(command=canvas.yview)
+        xbar.pack(side='bottom', fill='x')
+        ybar.pack(side='right', fill='y')
+        canvas.pack(side='left', fill='both', expand=True)
+        canvas.create_image(0, 0, anchor='nw', image=image)
+        canvas.image = image  # Keep Tk photo alive during the selection dialog.
+        chosen = {'start': None, 'box': None, 'rect_id': None}
+
+        def coords(event):
+            return int(canvas.canvasx(event.x)), int(canvas.canvasy(event.y))
+
+        def press(event):
+            chosen['start'] = coords(event)
+            chosen['box'] = None
+            if chosen['rect_id'] is not None:
+                canvas.delete(chosen['rect_id'])
+            x, y = chosen['start']
+            chosen['rect_id'] = canvas.create_rectangle(
+                x, y, x, y, outline='#68e0ff', width=2, dash=(4, 2))
+
+        def drag(event):
+            if chosen['start'] is None:
+                return
+            x0, y0 = chosen['start']
+            x1, y1 = coords(event)
+            canvas.coords(chosen['rect_id'], x0, y0, x1, y1)
+
+        def release(event):
+            if chosen['start'] is not None:
+                chosen['box'] = chosen['start'] + coords(event)
+                drag(event)
+
+        canvas.bind('<ButtonPress-1>', press)
+        canvas.bind('<B1-Motion>', drag)
+        canvas.bind('<ButtonRelease-1>', release)
+
+        footer = tk.Frame(win, bg=T.BG)
+        footer.pack(fill='x', padx=px(16), pady=px(12))
+        status = tk.StringVar(value='Keine Auswahl · das XP-Popup muss im Bild sichtbar sein.')
+        tk.Label(footer, textvariable=status, bg=T.BG, fg=T.MUTE,
+                 font=font(11), anchor='w').pack(side='left', fill='x',
+                                                  expand=True)
+
+        def install():
+            if chosen['box'] is None:
+                status.set('Bitte zuerst ein Rechteck um das Truhenwort ziehen.')
+                return
+            try:
+                word = german_word_mask(image, chosen['box'])
+                info = install_german_visual_template(folder, word)
+            except (ValueError, OSError) as exc:
+                status.set('Kalibrierung fehlgeschlagen.')
+                messagebox.showwarning('Kalibrierung', str(exc)[:400],
+                                       parent=win)
+                return
+            win.destroy()
+            messagebox.showinfo(
+                'Deutsch-Kalibrierung installiert',
+                'Muster: %s × %s Pixel.\n\n'
+                'Starte Fortnite Visual Chest Counter NEU, gehe dort zu '
+                'Settings → Game language und wähle '
+                'Deutsch (SquadLoot Beta). Danach Start counting. '
+                'Die bestehende Verbindung zu SquadLoot bleibt gleich.\n\n'
+                'Teste die Treffer mit 5–10 Truhen; dieses Muster ist '
+                'noch nicht anhand echter deutscher Matches validiert.'
+                % (info['width'], info['height']), parent=self.root)
+            self.visual_info.set('Deutsch-Muster installiert · externe App '
+                                 'neu starten und „Deutsch (SquadLoot Beta)“ wählen.')
+
+        Button(footer, 'Muster installieren', install, 'primary',
+               icon='check', bg=T.BG).pack(side='right')
+        Button(footer, 'Abbrechen', win.destroy, 'ghost',
+               bg=T.BG).pack(side='right', padx=(0, px(8)))
+        win.transient(self.root)
+        win.grab_set()
+        self.root.wait_window(win)
+
+    def restore_visual_german(self):
+        folder = self.core.config.get('visual_counter_dir', '')
+        if not messagebox.askyesno(
+                'Deutsch-Anpassung rückgängig machen',
+                'Bitte zuerst den externen Visual Chest Counter schließen.\n'
+                'Die gesicherten Originaldateien werden wiederhergestellt. '
+                'Fortfahren?'):
+            return
+        try:
+            restore_german_visual_template(folder)
+        except (ValueError, OSError) as exc:
+            messagebox.showwarning('Deutsch zurücksetzen', str(exc)[:350])
+            return
+        messagebox.showinfo('Deutsch zurückgesetzt',
+                            'Originaldateien wiederhergestellt. Bitte den '
+                            'Visual Chest Counter neu starten.')
+        self.visual_info.set('Deutsch-Anpassung entfernt, Originaldateien wiederhergestellt.')
 
     def toggle_visual_bridge(self):
         bridge = self.visual_bridge

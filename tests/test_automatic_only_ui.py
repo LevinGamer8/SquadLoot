@@ -56,7 +56,7 @@ class AutomaticOnlyInterfaceTests(unittest.TestCase):
         win = (WINDOWS / 'VERSION').read_text(encoding='ascii').strip()
         pi = (ROOT / 'SquadLoot-Pi-Server' / 'VERSION').read_text(encoding='ascii').strip()
         self.assertEqual(win, pi)
-        self.assertEqual(win, '1.5.2')
+        self.assertEqual(win, '1.5.3')
 
 
 if __name__ == '__main__':

@@ -398,3 +398,13 @@ unverändert: SQLite, Cloudflare, Archiv, CSV, API und veröffentlichte
 Clientupdate-Endpunkte sind rückwärtskompatibel. Bilder bleiben auf dem Client;
 nur vorläufige Zähleränderungen erreichen den Pi. Die deutsche Erkennung ist
 noch nicht durch Live-Matches validiert.
+
+
+## SquadLoot 1.5.4 – Windows macht die Analyse jetzt selbstständig
+
+Der Pi erhält weiterhin ausschließlich vorläufige Live-Zählwerte und
+Replay-bestätigte Matchdaten. Lokal auf den Windows-PCs werden die beiden
+offenen Analyse-Engines ohne zusätzliches GUI verwaltet und beim ersten
+Bedarf mit festem SHA256 vom jeweiligen Original-GitHub-Release geholt.
+Es ist keine weitere Docker-/Pi-Abhängigkeit notwendig.
+SQLite, vorhandene Matches, CSV-Export und Cloudflare Access bleiben gleich.

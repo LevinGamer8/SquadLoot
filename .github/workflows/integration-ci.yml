@@ -44,3 +44,46 @@ jobs:
               assert hashlib.sha256(p.read_bytes()).hexdigest()==meta[key+'sha256']
           print('SHA-256 and package sizes verified')
           PY
+
+  windows-managed-engines:
+    if: github.event_name == 'pull_request' && contains(github.head_ref, 'one-click-live-auto-replay')
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify original pinned third-party runtime startup
+        shell: bash
+        run: |
+          python - <<'PY'
+          import pathlib, sys, tempfile, subprocess
+          sys.path.insert(0, 'SquadLoot-Windows-Client')
+          from vision import ManagedComponentStore
+          with tempfile.TemporaryDirectory(prefix='squadloot-ci-') as temp:
+              store = ManagedComponentStore(root=pathlib.Path(temp))
+              replay = store.ensure_replay()
+              assert replay.is_file()
+              test = subprocess.run([str(replay), '--help'], capture_output=True,
+                                    text=True, errors='replace', timeout=40)
+              assert test.returncode == 0, ('Replay failed', test.stderr[-1000:])
+              print('Replay CLI --help verified')
+              demos = pathlib.Path(temp) / 'empty-demos'
+              data = pathlib.Path(temp) / 'replay-data'
+              demos.mkdir()
+              data.mkdir()
+              test = subprocess.run(
+                  [str(replay), '--once', '--data', str(data),
+                   '--demos', str(demos), '--lang', 'en'],
+                  capture_output=True, text=True, errors='replace', timeout=65)
+              assert test.returncode == 0, ('Passive --once failed',
+                                            test.stderr[-1200:], test.stdout[-1200:])
+              print('Passive Replay --once verified with empty demos')
+              live = store.ensure_visual()
+              py = store.visual_python()
+              assert py.is_file()
+              test = subprocess.run(
+                  [str(py), '-m', 'fortnite_chest_counter', '--version'],
+                  cwd=live, capture_output=True, text=True, errors='replace',
+                  timeout=45)
+              assert test.returncode == 0, ('Live worker failed', test.stderr[-1000:])
+              print('Visual headless runtime verified', test.stdout.strip())
+          PY

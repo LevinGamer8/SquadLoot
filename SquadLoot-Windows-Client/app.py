@@ -29,12 +29,9 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, font as tkfont, messagebox
 
-from client_core import (Core, CONFIG, chestcounter_exe, read_json, sync_once,
-                         validate_url)
+from client_core import (Core, CONFIG, read_json, sync_once, validate_url)
 from update_manager import current_version, check_and_stage, log_error
-from vision import (VisionDetector, VisualCounterBridge, german_visual_counter_root,
-                    normalized_german_screenshot, german_word_mask,
-                    install_german_visual_template, restore_german_visual_template)
+from vision import ManagedLiveEngine
 
 # --------------------------------------------------------------------------
 # Display scaling
@@ -1742,7 +1739,7 @@ NAV = (
 
 PAGE_META = {
     'dashboard': ('Dashboard', 'Dein Squad, deine Kisten, in Echtzeit.'),
-    'live': ('Live-Tracking', 'Automatische Erkennung und Replay-Abgleich.'),
+    'live': ('Live-Tracking', 'Ein Klick zur Live-Erkennung.'),
     'history': ('Match-Historie', 'Alle vom Replay bestätigten Runden.'),
     'squad': ('Squad', 'Wer trägt wie viel zum Squad-Ergebnis bei.'),
     'settings': ('Einstellungen', 'Verbindung, Konten und Erkennung konfigurieren.'),
@@ -1815,8 +1812,7 @@ class Gui:
         self.hotkeys = None
         self.hotkey_note = ''
         self.hud_fields = {}
-        self.vision = None
-        self.visual_bridge = VisualCounterBridge(self.core)
+        self.live_engine = ManagedLiveEngine(self.core)
         self.update_busy = False
         self.update_pending = False
         self.pending_version = ''
@@ -1840,6 +1836,7 @@ class Gui:
         self.root.after(500, self.refresh)
         self.root.after(9_000, self.periodic_update_check)
         self.start_hotkeys()
+        self.core.replay_engine.start()  # automatic passive replay scan
         if self.hud.opt('hud_enabled'):
             self.root.after(250, self.restore_hud)
         if all(self.core.config.get(k) for k in ('server_url', 'token', 'name')):
@@ -2218,195 +2215,36 @@ class Gui:
 
     # ---- live tracking -------------------------------------------------
     def build_live(self):
-        page = self.page_body('live')
-
-        banner = Card(page, fill=T.SURFACE, accent=T.ACCENT)
-        banner.pack(fill='x', pady=(T.S4, T.S3))
-        row = tk.Frame(banner.body, bg=T.SURFACE)
-        row.pack(fill='x')
-        text = tk.Frame(row, bg=T.SURFACE)
-        text.pack(side='left', fill='x', expand=True)
-        label(text, 'Aktueller Zählstand', 15, 'bold', bg=T.SURFACE,
-              anchor='w').pack(fill='x')
-        self.live_sub = tk.StringVar(value='Live-Schätzungen werden nach dem Match per Replay bestätigt.')
-        tk.Label(text, textvariable=self.live_sub, bg=T.SURFACE, fg=T.MUTE,
-                 font=font(11), anchor='w').pack(fill='x', pady=(px(2), 0))
-        self.live_state = Pill(row, 'Tracking inaktiv', T.MUTE, T.SURFACE_2, bg=T.SURFACE)
+        page = self.page_body('live', max_width=890)
+        panel = Card(page, fill=T.SURFACE, accent=T.ACCENT)
+        panel.pack(fill='x', pady=(T.S4, T.S3))
+        header = tk.Frame(panel.body, bg=T.SURFACE)
+        header.pack(fill='x')
+        label(header, 'Live-Tracking', 18, 'bold', bg=T.SURFACE,
+              anchor='w').pack(side='left')
+        self.live_state = Pill(header, 'Replay automatisch', T.CYAN, T.TINT_CYAN,
+                               bg=T.SURFACE)
         self.live_state.pack(side='right')
-
-        counters = tk.Frame(banner.body, bg=T.SURFACE)
-        counters.pack(fill='x', pady=(T.S4, 0))
+        bar = tk.Frame(panel.body, bg=T.SURFACE)
+        bar.pack(fill='x', pady=(T.S4, T.S4))
         self.live_tiles = {}
-        tiles = (
-            ('vision', 'Live erkannt', 'bolt', T.WARN, T.TINT_WARN),
-            ('squad', 'Squad aktuell', 'users', T.CYAN, T.TINT_CYAN),
-            ('verified', 'Replay bestätigt', 'check', T.OK, T.TINT_OK),
-        )
-        for i, (key, title, icon, tone, tint) in enumerate(tiles):
-            tile = MiniStat(counters, title, icon, tone, tint, bg=T.SURFACE)
-            tile.grid(row=0, column=i, sticky='nsew', padx=(0 if i == 0 else px(6), 0))
-            counters.grid_columnconfigure(i, weight=1, uniform='live')
+        for i, (key, title, icon, tone, tint) in enumerate((
+                ('vision', 'Deine Kisten', 'chest', T.ACCENT, T.TINT_ACCENT),
+                ('squad', 'Squad gesamt', 'users', T.CYAN, T.TINT_CYAN),
+                ('verified', 'Replay bestätigt', 'check', T.OK, T.TINT_OK))):
+            tile = MiniStat(bar, title, icon, tone, tint, bg=T.SURFACE)
+            tile.grid(row=0, column=i, sticky='nsew',
+                      padx=(0 if i == 0 else px(6), 0))
+            bar.grid_columnconfigure(i, weight=1, uniform='live')
             self.live_tiles[key] = tile
-
-        columns = tk.Frame(page, bg=T.BG)
-        columns.pack(fill='both', expand=True)
-        columns.grid_columnconfigure(0, weight=1, uniform='live2')
-        columns.grid_columnconfigure(1, weight=1, uniform='live2')
-        columns.grid_rowconfigure(0, weight=1)
-
-        roundtools = Card(columns)
-        roundtools.grid(row=0, column=0, sticky='new', padx=(0, T.S3))
-        section_head(roundtools.body, 'Runde und Replay',
-                     'Keine manuelle Kistenzählung nötig. Visuelle Werte '
-                     'werden nach dem Match durch das Replay ersetzt.')
-        ops = tk.Frame(roundtools.body, bg=T.SURFACE)
-        ops.pack(fill='x', pady=(T.S3, 0))
-        Button(ops, 'Neue Squad-Runde', self.start_round, 'secondary', icon='spark',
-               bg=T.SURFACE).pack(anchor='w', fill='x', pady=(0, px(6)))
-        Button(ops, 'Replay auswerten', self.run_chestcounter, 'secondary', icon='film',
-               bg=T.SURFACE).pack(anchor='w', fill='x')
-        divider(roundtools.body)
-        label(roundtools.body,
-              'Falls eine Beta-Erkennung falsche Kisten gezählt hat, '
-              'kannst du nur die vorläufigen Werte zurücksetzen. '
-              'Bereits gespeicherte Matches bleiben erhalten.',
-              11, fg=T.MUTE, bg=T.SURFACE, anchor='w', justify='left',
-              wraplength=px(330)).pack(fill='x', pady=(0, T.S3))
-        Button(roundtools.body, 'Live-Schätzung zurücksetzen',
-               self.confirm_reset, 'ghost', icon='refresh',
-               bg=T.SURFACE).pack(anchor='w')
-
-        vision = Card(columns)
-        vision.grid(row=0, column=1, sticky='new')
-        head = section_head(vision.body, 'Bildschirmerkennung',
-                            'Opt-in · liest nur einen Bildausschnitt, nie das Spiel.')
-        Pill(head, 'BETA', T.WARN, T.TINT_WARN, dot=False, bg=T.SURFACE).pack(side='right')
-        self.vision_state = Pill(vision.body, 'Erkennung ist AUS', T.MUTE, T.SURFACE_2,
-                                 bg=T.SURFACE)
-        self.vision_state.pack(anchor='w')
-        label(vision.body, 'Erkennungsqualität', 11, 'bold', fg=T.MUTE, bg=T.SURFACE,
-              anchor='w').pack(fill='x', pady=(T.S4, px(5)))
-        self.vision_meter = Meter(vision.body, tone=T.WARN, bg=T.SURFACE)
-        self.vision_meter.pack(fill='x')
-        self.vision_detail = tk.StringVar(value='Noch keine Messung. Vorlage wählen und starten.')
-        tk.Label(vision.body, textvariable=self.vision_detail, bg=T.SURFACE, fg=T.MUTE,
-                 font=font(11), anchor='w', justify='left',
-                 wraplength=px(330)).pack(fill='x', pady=(px(6), 0))
-        keyrow = tk.Frame(vision.body, bg=T.SURFACE)
-        keyrow.pack(fill='x', pady=(T.S4, 0))
-        label(keyrow, 'Interaktionstaste', 12, fg=T.DIM, bg=T.SURFACE).pack(side='left')
-        self.vision_key = tk.StringVar(value=self.core.config.get('interact_key', 'E'))
-        keybox = tk.Frame(keyrow, bg=T.FIELD, highlightthickness=1,
-                          highlightbackground=T.LINE_STRONG, highlightcolor=T.ACCENT)
-        keybox.pack(side='left', padx=(T.S3, T.S3))
-        tk.Entry(keybox, textvariable=self.vision_key, width=3, justify='center',
-                 bg=T.FIELD, fg=T.TEXT, insertbackground=T.ACCENT_HI, relief='flat',
-                 bd=0, highlightthickness=0, font=font(13, 'bold')).pack(
-                     padx=px(8), pady=px(6))
-        label(keyrow, 'A–Z oder 0–9', 11, fg=T.MUTE, bg=T.SURFACE).pack(side='left')
-        actions = tk.Frame(vision.body, bg=T.SURFACE)
-        actions.pack(fill='x', pady=(T.S4, 0))
-        Button(actions, 'PNG-Vorlage', self.select_vision_template, 'secondary',
-               icon='folder', bg=T.SURFACE).pack(side='left')
-        self.vision_button = Button(actions, 'Erkennung starten', self.toggle_vision,
-                                    'primary', icon='play', bg=T.SURFACE)
-        self.vision_button.pack(side='left', padx=(px(6), 0))
-        divider(vision.body)
-        label(vision.body,
-              'Gezählt wird nur, wenn der Suchhinweis sichtbar war, du die Taste '
-              'gedrückt hast und der Hinweis danach verschwindet. Das ist kein '
-              'sicherer Nachweis für eine geöffnete Truhe — das Replay entscheidet.',
-              11, fg=T.MUTE, bg=T.SURFACE, anchor='w', justify='left',
-              wraplength=px(340)).pack(fill='x')
-        label(vision.body,
-              'Performance: nur der mittlere Bildausschnitt, maximal 2,5 Bilder pro '
-              'Sekunde und nur bei aktivem Fortnite-Fenster. Bilder und Tastendrücke '
-              'verlassen deinen PC nie.',
-              11, fg=T.MUTE, bg=T.SURFACE, anchor='w', justify='left',
-              wraplength=px(340)).pack(fill='x', pady=(px(8), 0))
-
-        visual = Card(page)
-        visual.pack(fill='x', pady=(T.S4, 0))
-        visual_head = section_head(
-            visual.body, 'Visueller Kistenzähler · Live-Test',
-            'Optionaler Test mit Fortnite Visual Chest Counter v0.2.3.')
-        Pill(visual_head, 'EXPERIMENTELL', T.WARN, T.TINT_WARN, dot=False,
-             bg=T.SURFACE).pack(side='right')
-        label(visual.body,
-              'Die andere Anwendung erkennt CHEST-XP-Popups im Spielbild. '
-              'SquadLoot liest nur deren kleine OBS-Zählerdateien. '
-              'Es wird KEIN zweiter Bildschirm-Scan durch SquadLoot gestartet.',
-              11, fg=T.DIM, bg=T.SURFACE, anchor='w', justify='left',
-              wraplength=px(810)).pack(fill='x', pady=(0, T.S3))
-        self.visual_path_label = tk.StringVar(
-            value=self.visual_folder_caption())
-        tk.Label(visual.body, textvariable=self.visual_path_label, bg=T.SURFACE,
-                 fg=T.DIM, font=font(11), anchor='w', justify='left',
-                 wraplength=px(810)).pack(fill='x')
-        actions = tk.Frame(visual.body, bg=T.SURFACE)
-        actions.pack(fill='x', pady=(T.S3, T.S3))
-        Button(actions, 'OBS-Ordner wählen', self.select_visual_folder, 'secondary',
-               icon='folder', bg=T.SURFACE).pack(side='left')
-        self.visual_button = Button(actions, 'Live-Test starten', self.toggle_visual_bridge,
-                                    'primary', icon='play', bg=T.SURFACE)
-        self.visual_button.pack(side='left', padx=(px(6), 0))
-        de_actions = tk.Frame(visual.body, bg=T.SURFACE)
-        de_actions.pack(fill='x', pady=(0, T.S3))
-        Button(de_actions, 'Deutsch kalibrieren', self.calibrate_visual_german,
-               'secondary', icon='target', bg=T.SURFACE).pack(side='left')
-        Button(de_actions, 'Deutsch zurücksetzen', self.restore_visual_german,
-               'ghost', icon='refresh', bg=T.SURFACE).pack(
-                   side='left', padx=(px(6), 0))
-        label(visual.body,
-              'Deutsch (Beta): Einmal ein echtes deutsches Truhen-XP-Popup '
-              'als Screenshot auswählen und das Truhenwort markieren. '
-              'Der externe Visual Chest Counter muss dabei geschlossen sein.',
-              11, fg=T.MUTE, bg=T.SURFACE, anchor='w', justify='left',
-              wraplength=px(810)).pack(fill='x', pady=(0, T.S3))
-        self.visual_status = Pill(visual.body, 'Test ausgeschaltet', T.MUTE,
-                                  T.SURFACE_2, bg=T.SURFACE)
-        self.visual_status.pack(anchor='w')
-        self.visual_info = tk.StringVar(
-            value='Erst Fortnite Visual Chest Counter starten und den '
-                  'OBS-Ordner wählen. Standardmäßig werden keine Werte übernommen.')
-        tk.Label(visual.body, textvariable=self.visual_info, bg=T.SURFACE,
+        self.live_button = Button(panel.body, 'Live-Test starten',
+                                  self.toggle_integrated_live, 'primary',
+                                  icon='play', bg=T.SURFACE)
+        self.live_button.pack(anchor='w')
+        self.live_info = tk.StringVar(value='Replays werden automatisch ausgewertet. Live ist optional.')
+        tk.Label(panel.body, textvariable=self.live_info, bg=T.SURFACE,
                  fg=T.MUTE, font=font(11), anchor='w', justify='left',
-                 wraplength=px(810)).pack(fill='x', pady=(T.S3, 0))
-        label(visual.body,
-              'APPROX ist die geschätzte Gesamtzahl und enthält CERTAIN bereits. '
-              'SquadLoot addiert sie deshalb NICHT. Alte Zählerstände werden beim '
-              'Start und bei jeder neuen Runde als Ausgangswert genommen. '
-              'Nach dem Match ersetzt das Replay die Schätzung.',
-              11, fg=T.MUTE, bg=T.SURFACE, anchor='w', justify='left',
-              wraplength=px(810)).pack(fill='x', pady=(px(8), 0))
-
-        legend = Card(page)
-        legend.pack(fill='x', pady=(T.S4, 0))
-        section_head(legend.body, 'Geschätzt oder bestätigt?',
-                     'So liest du jede Zahl in SquadLoot.')
-        rows = tk.Frame(legend.body, bg=T.SURFACE)
-        rows.pack(fill='x')
-        items = (
-            ('bolt', T.WARN, T.TINT_WARN, 'Geschätzt',
-             'Visuelle Erkennung während der Runde, noch nicht bestätigt.'),
-            ('check', T.OK, T.TINT_OK, 'Replay bestätigt',
-             'Von ChestCounter aus deinem Replay gelesen — verbindlich.'),
-            ('signal', T.CYAN, T.TINT_CYAN, 'Live übertragen',
-             'Wird gerade an deinen Pi gesendet, noch nicht bestätigt.'),
-        )
-        for i, (icon, tone, tint, title, text) in enumerate(items):
-            cell = tk.Frame(rows, bg=T.SURFACE)
-            cell.grid(row=0, column=i, sticky='nsew', padx=(0 if i == 0 else T.S4, 0))
-            rows.grid_columnconfigure(i, weight=1, uniform='legend')
-            badge = tk.Canvas(cell, width=px(28), height=px(28), bg=T.SURFACE, bd=0,
-                              highlightthickness=0)
-            badge.pack(anchor='w')
-            round_rect(badge, 0, 0, px(28), px(28), px(9), tint, mix(tint, tone, .25))
-            draw_icon(badge, icon, px(14), px(14), px(15), tone)
-            label(cell, title, 12, 'bold', fg=tone, bg=T.SURFACE,
-                  anchor='w').pack(fill='x', pady=(px(6), px(2)))
-            label(cell, text, 11, fg=T.MUTE, bg=T.SURFACE, anchor='w', justify='left',
-                  wraplength=px(230)).pack(fill='x')
+                 wraplength=px(780)).pack(fill='x', pady=(T.S3, 0))
 
     # ---- match history -------------------------------------------------
     def build_history(self):
@@ -2617,27 +2455,6 @@ class Gui:
         self.add_field(body, 'replay_dir', 'Fortnite Replay-Ordner',
                        'Standard: %LOCALAPPDATA%\\FortniteGame\\Saved\\Demos',
                        browse=lambda: self.pick_directory('replay_dir'))
-        self.add_field(body, 'data_json', 'ChestCounter data.json',
-                       'Die von ChestCounter erzeugte Auswertungsdatei.',
-                       browse=lambda: self.pick_file('data_json', [('JSON', '*.json')]))
-        self.add_field(body, 'chestcounter_exe', 'Pfad zur ChestCounter.exe',
-                       'Optional. Leer lassen, wenn du ChestCounter selbst startest.',
-                       browse=lambda: self.pick_file('chestcounter_exe',
-                                                     [('Programm', '*.exe')]))
-
-        body = self.settings_section(
-            page, 'Live-Erkennung (Beta)', 'Experimentell. Liest nur einen '
-            'Bildausschnitt und eine einzelne Taste.', 'bolt', T.WARN, T.TINT_WARN)
-        self.template_var = tk.StringVar(value=self.template_caption())
-        tk.Label(body, textvariable=self.template_var, bg=T.SURFACE, fg=T.DIM,
-                 font=font(12), anchor='w', justify='left').pack(fill='x')
-        row = tk.Frame(body, bg=T.SURFACE)
-        row.pack(fill='x', pady=(T.S3, 0))
-        Button(row, 'PNG-Vorlage wählen', self.select_vision_template, 'secondary',
-               icon='folder', bg=T.SURFACE).pack(side='left')
-        Button(row, 'Zur Live-Erkennung', lambda: self.show_page('live'), 'ghost',
-               bg=T.SURFACE).pack(side='left', padx=(px(6), 0))
-
         self.build_hud_settings(page)
 
         body = self.settings_section(
@@ -2786,11 +2603,6 @@ class Gui:
         except tk.TclError as exc:
             messagebox.showwarning('HUD-Diagnose',
                                    'HUD-Fenster kann nicht abgefragt werden: ' + str(exc))
-
-    def template_caption(self):
-        path = self.core.config.get('vision_template', '')
-        return ('Vorlage: ' + Path(path).name) if path else \
-            'Noch keine PNG-Vorlage der Durchsuchen-Aufforderung gewählt.'
 
     # ---- updates -------------------------------------------------------
     def build_updates(self):
@@ -3050,23 +2862,14 @@ class Gui:
             self.job(lambda: 'Neue Squad-Runde #' + str(self.core.new_round()))
 
     def run_chestcounter(self):
-        exe = chestcounter_exe(self.core.config)
-        if not exe:
-            messagebox.showwarning('ChestCounter fehlt',
-                                   'Bitte unter Einstellungen den Pfad zur '
-                                   'ChestCounter.exe eintragen.')
-            self.show_page('settings')
-            return
-        self.set_status('ChestCounter wertet vorhandene Replays aus …', T.DIM)
+        self.set_status('Replays werden lokal ausgewertet …', T.DIM)
 
         def run():
-            result = subprocess.run([str(exe), '--once'], capture_output=True,
-                                    text=True, timeout=200, errors='replace')
-            if result.returncode:
-                raise RuntimeError('ChestCounter Exit ' + str(result.returncode) + ': '
-                                   + result.stderr[-200:])
+            engine = self.core.replay_engine
+            if not engine.scan_once(force=True) and engine.error:
+                raise RuntimeError(engine.error)
             count = self.core.sync_matches(self.core.credentials(), max_items=100000)
-            return f'{count} Matches nach der Replay-Auswertung synchronisiert'
+            return f'{count} Replay-Matches synchronisiert'
 
         self.job(run)
 
@@ -3083,248 +2886,26 @@ class Gui:
         if messagebox.askyesno('Zähler zurücksetzen',
                                'Nur deine vorläufigen lokalen Zähler zurücksetzen?'):
             self.core.reset_local_counters()
-            self.visual_bridge.reset_baseline()
+            self.live_engine.reset_counts()
             self.set_status('Lokale Zähler zurückgesetzt.', T.DIM)
 
-    # ---- external visual chest counter (opt-in) ------------------------
-    def visual_folder_caption(self):
-        folder = self.core.config.get('visual_counter_dir', '')
-        return ('OBS-Ausgabe: ' + folder) if folder else \
-            'Noch kein OBS-Ausgabeordner gewählt.'
-
-    def select_visual_folder(self):
-        folder = filedialog.askdirectory(
-            title='Fortnite Visual Chest Counter: obs_output auswählen')
-        if folder:
-            self.core.set_config({'visual_counter_dir': folder})
-            self.visual_path_label.set(self.visual_folder_caption())
-            self.visual_info.set('Ordner gespeichert. Live-Test kann gestartet werden.')
-
-
-    def calibrate_visual_german(self):
-        """Explicit, local one-time training of the external detector from a REAL popup."""
-        folder = self.core.config.get('visual_counter_dir', '')
-        try:
-            german_visual_counter_root(folder)
-        except (ValueError, OSError) as exc:
-            messagebox.showwarning('Deutsch-Kalibrierung', str(exc))
-            return
-        if self.visual_bridge.running:
-            messagebox.showwarning('Deutsch-Kalibrierung',
-                                   'Bitte zuerst den SquadLoot Live-Test stoppen.')
-            return
-        if not messagebox.askyesno(
-                'Visual Chest Counter geschlossen?',
-                'Bitte den EXTERNEN Fortnite Visual Chest Counter vollständig '
-                'beenden (auch seine Zählung), bevor seine Erkennungsdateien '
-                'angepasst werden. Die Originaldateien werden gesichert. '
-                'Ist er geschlossen?'):
-            return
-        screenshot = filedialog.askopenfilename(
-            title='Screenshot mit deutschem Truhen-XP-Popup auswählen',
-            filetypes=[('Fortnite-Screenshot', '*.png *.jpg *.jpeg *.webp *.bmp'),
-                       ('Alle Dateien', '*.*')])
-        if not screenshot:
-            return
-        import tempfile
-        try:
-            with tempfile.TemporaryDirectory(prefix='squadloot-de-') as temp:
-                normalized = normalized_german_screenshot(
-                    folder, screenshot, Path(temp) / 'fortnite-1280x720.png')
-                image = tk.PhotoImage(file=str(normalized))
-                self._german_select_word(folder, image)
-        except (OSError, ValueError, subprocess.SubprocessError, tk.TclError) as exc:
-            messagebox.showerror('Deutsch-Kalibrierung', str(exc)[:350],
-                                 parent=self.root)
-
-    def _german_select_word(self, folder, image):
-        win = tk.Toplevel(self.root)
-        win.title('SquadLoot · Deutsches Truhenwort auswählen')
-        win.configure(bg=T.BG)
-        win.geometry(f'{min(1350, self.root.winfo_screenwidth()-70)}x'
-                     f'{min(890, self.root.winfo_screenheight()-100)}')
-        tk.Label(win,
-                 text='Markiere NUR das violette Wort für eine geöffnete '
-                      'Truhe (z. B. TRUHE), NICHT +XP oder die ganze Zeile. '
-                      'Ziehe dafür ein kleines Rechteck mit der Maus.',
-                 bg=T.BG, fg=T.TEXT, font=font(12), anchor='w', justify='left',
-                 wraplength=px(1150)).pack(fill='x', padx=px(18), pady=px(12))
-        frame = tk.Frame(win, bg=T.BG)
-        frame.pack(fill='both', expand=True, padx=px(14))
-        xbar = tk.Scrollbar(frame, orient='horizontal')
-        ybar = tk.Scrollbar(frame, orient='vertical')
-        canvas = tk.Canvas(frame, width=1280, height=720, bg='#060913',
-                           scrollregion=(0, 0, 1280, 720),
-                           xscrollcommand=xbar.set, yscrollcommand=ybar.set,
-                           highlightthickness=0, borderwidth=0)
-        xbar.config(command=canvas.xview)
-        ybar.config(command=canvas.yview)
-        xbar.pack(side='bottom', fill='x')
-        ybar.pack(side='right', fill='y')
-        canvas.pack(side='left', fill='both', expand=True)
-        canvas.create_image(0, 0, anchor='nw', image=image)
-        canvas.image = image  # Keep Tk photo alive during the selection dialog.
-        chosen = {'start': None, 'box': None, 'rect_id': None}
-
-        def coords(event):
-            return int(canvas.canvasx(event.x)), int(canvas.canvasy(event.y))
-
-        def press(event):
-            chosen['start'] = coords(event)
-            chosen['box'] = None
-            if chosen['rect_id'] is not None:
-                canvas.delete(chosen['rect_id'])
-            x, y = chosen['start']
-            chosen['rect_id'] = canvas.create_rectangle(
-                x, y, x, y, outline='#68e0ff', width=2, dash=(4, 2))
-
-        def drag(event):
-            if chosen['start'] is None:
-                return
-            x0, y0 = chosen['start']
-            x1, y1 = coords(event)
-            canvas.coords(chosen['rect_id'], x0, y0, x1, y1)
-
-        def release(event):
-            if chosen['start'] is not None:
-                chosen['box'] = chosen['start'] + coords(event)
-                drag(event)
-
-        canvas.bind('<ButtonPress-1>', press)
-        canvas.bind('<B1-Motion>', drag)
-        canvas.bind('<ButtonRelease-1>', release)
-
-        footer = tk.Frame(win, bg=T.BG)
-        footer.pack(fill='x', padx=px(16), pady=px(12))
-        status = tk.StringVar(value='Keine Auswahl · das XP-Popup muss im Bild sichtbar sein.')
-        tk.Label(footer, textvariable=status, bg=T.BG, fg=T.MUTE,
-                 font=font(11), anchor='w').pack(side='left', fill='x',
-                                                  expand=True)
-
-        def install():
-            if chosen['box'] is None:
-                status.set('Bitte zuerst ein Rechteck um das Truhenwort ziehen.')
-                return
-            try:
-                word = german_word_mask(image, chosen['box'])
-                info = install_german_visual_template(folder, word)
-            except (ValueError, OSError) as exc:
-                status.set('Kalibrierung fehlgeschlagen.')
-                messagebox.showwarning('Kalibrierung', str(exc)[:400],
-                                       parent=win)
-                return
-            win.destroy()
-            messagebox.showinfo(
-                'Deutsch-Kalibrierung installiert',
-                'Muster: %s × %s Pixel.\n\n'
-                'Starte Fortnite Visual Chest Counter NEU, gehe dort zu '
-                'Settings → Game language und wähle '
-                'Deutsch (SquadLoot Beta). Danach Start counting. '
-                'Die bestehende Verbindung zu SquadLoot bleibt gleich.\n\n'
-                'Teste die Treffer mit 5–10 Truhen; dieses Muster ist '
-                'noch nicht anhand echter deutscher Matches validiert.'
-                % (info['width'], info['height']), parent=self.root)
-            self.visual_info.set('Deutsch-Muster installiert · externe App '
-                                 'neu starten und „Deutsch (SquadLoot Beta)“ wählen.')
-
-        Button(footer, 'Muster installieren', install, 'primary',
-               icon='check', bg=T.BG).pack(side='right')
-        Button(footer, 'Abbrechen', win.destroy, 'ghost',
-               bg=T.BG).pack(side='right', padx=(0, px(8)))
-        win.transient(self.root)
-        win.grab_set()
-        self.root.wait_window(win)
-
-    def restore_visual_german(self):
-        folder = self.core.config.get('visual_counter_dir', '')
-        if not messagebox.askyesno(
-                'Deutsch-Anpassung rückgängig machen',
-                'Bitte zuerst den externen Visual Chest Counter schließen.\n'
-                'Die gesicherten Originaldateien werden wiederhergestellt. '
-                'Fortfahren?'):
+    # ---- one-click headless live tracking ------------------------------
+    def toggle_integrated_live(self):
+        if self.live_engine.running:
+            self.live_engine.stop()
+            self.live_button.set_label('Live-Test starten', icon='play')
+            self.live_state.set('Replay automatisch', T.CYAN, T.TINT_CYAN)
+            self.live_info.set('Live beendet. Replays werden weiter automatisch ausgewertet.')
             return
         try:
-            restore_german_visual_template(folder)
-        except (ValueError, OSError) as exc:
-            messagebox.showwarning('Deutsch zurücksetzen', str(exc)[:350])
-            return
-        messagebox.showinfo('Deutsch zurückgesetzt',
-                            'Originaldateien wiederhergestellt. Bitte den '
-                            'Visual Chest Counter neu starten.')
-        self.visual_info.set('Deutsch-Anpassung entfernt, Originaldateien wiederhergestellt.')
-
-    def toggle_visual_bridge(self):
-        bridge = self.visual_bridge
-        if bridge.running:
-            bridge.stop()
-            self.visual_button.set_label('Live-Test starten', icon='play')
-            self.visual_status.set('Test ausgeschaltet', T.MUTE, T.SURFACE_2)
-            self.visual_info.set('Live-Test gestoppt. Bisherige Schätzwerte bleiben '
-                                 'bis zur nächsten Runde oder Replay-Bestätigung sichtbar.')
-            return
-        folder = self.core.config.get('visual_counter_dir', '')
-        try:
-            if not folder:
-                raise ValueError('Zuerst den obs_output-Ordner aus der '
-                                 'Fortnite-Visual-Chest-Counter-Installation wählen.')
-            # Never run both visual algorithms: they would double count.
-            if self.vision_running():
-                self.vision.stop_now()
-                self.vision_button.set_label('Erkennung starten', icon='play')
-                self.vision_state.set('Erkennung ist AUS', T.MUTE, T.SURFACE_2)
-                self.vision_meter.set(0)
-            bridge.start(folder)
-            self.visual_button.set_label('Live-Test stoppen', icon='stop')
-            self.visual_status.set('Live-Test aktiv', T.WARN, T.TINT_WARN)
-            self.visual_info.set('Startwerte ignoriert. Öffne jetzt eine Kiste '
-                                 'und beobachte APPROX / CERTAIN.')
-        except (ValueError, OSError) as exc:
-            self.visual_status.set('Nicht gestartet', T.BAD, T.TINT_BAD)
-            self.visual_info.set(str(exc))
-            messagebox.showwarning('Visueller Live-Test', str(exc))
-
-    # ---- vision --------------------------------------------------------
-    def select_vision_template(self):
-        name = filedialog.askopenfilename(
-            title='PNG der Durchsuchen-Aufforderung',
-            filetypes=[('PNG', '*.png'), ('Bilder', '*.png *.jpg *.jpeg')])
-        if name:
-            self.core.set_config({'vision_template': name})
-            if hasattr(self, 'template_var'):
-                self.template_var.set(self.template_caption())
-            self.vision_detail.set('Vorlage: ' + Path(name).name
-                                   + ' · Erkennung noch AUS')
-
-    def vision_running(self):
-        return bool(self.vision and self.vision.thread and self.vision.thread.is_alive())
-
-    def toggle_vision(self):
-        if self.visual_bridge.running:
-            self.visual_bridge.stop()
-            self.visual_button.set_label('Live-Test starten', icon='play')
-            self.visual_status.set('Test ausgeschaltet', T.MUTE, T.SURFACE_2)
-        if self.vision_running():
-            self.vision.stop_now()
-            self.vision_state.set('Erkennung ist AUS', T.MUTE, T.SURFACE_2)
-            self.vision_button.set_label('Erkennung starten', icon='play')
-            self.vision_meter.set(0)
-            return
-        try:
-            key = self.vision_key.get().strip().upper()
-            if len(key) != 1 or not key.isascii() or not key.isalnum():
-                raise ValueError('Bitte genau eine Interaktionstaste A–Z oder 0–9 '
-                                 'eintragen.')
-            self.core.set_config({'interact_key': key})
-            self.vision = VisionDetector(self.core,
-                                         self.core.config.get('vision_template', ''),
-                                         key=key)
-            self.vision.start()
-            self.vision_button.set_label('Erkennung stoppen', icon='stop')
-            self.vision_state.set('Aktiv · vorläufige Zählung', T.WARN, T.TINT_WARN)
-        except (ValueError, RuntimeError) as exc:
-            self.vision_state.set('Nicht gestartet', T.BAD, T.TINT_BAD)
-            self.vision_detail.set(str(exc))
-            messagebox.showwarning('Bildschirm-Erkennung', str(exc))
+            self.live_engine.start()
+            self.live_button.set_label('Live-Test stoppen', icon='stop')
+            self.live_state.set('Startet …', T.WARN, T.TINT_WARN)
+            self.live_info.set('Beim ersten Start wird der Erkennungs-Worker '
+                               'automatisch heruntergeladen und geprüft.')
+        except (OSError, ValueError, RuntimeError) as exc:
+            self.live_state.set('Fehler', T.BAD, T.TINT_BAD)
+            self.live_info.set(str(exc)[:240])
 
     # ---- in-game HUD ---------------------------------------------------
     def toggle_overlay(self):
@@ -3433,8 +3014,6 @@ class Gui:
 
     def refresh(self):
         self._tick += 1
-        if self.visual_bridge.running:
-            self.visual_bridge.poll()
         events = []
         while not self.events.empty():
             events.append(self.events.get_nowait())
@@ -3499,39 +3078,32 @@ class Gui:
                             compact=True)
 
         # -- live tracking -----------------------------------------------
-        self.live_tiles['vision'].set(vision_count)
+        self.live_tiles['vision'].set(own_verified if own_verified is not None else vision_count)
         self.live_tiles['squad'].set(squad_total)
         self.live_tiles['verified'].set(own_verified if own_verified is not None else '–')
-        running = self.vision_running()
-        external_running = self.visual_bridge.running
-        if current:
-            tracking = ('Live + Visual Counter (Beta)' if external_running else
-                        ('Live + Bildschirm (Beta)' if running else 'Live-Tracking aktiv'))
-            tone, tint = (T.WARN, T.TINT_WARN) if (running or external_running) else (T.CYAN, T.TINT_CYAN)
-        else:
-            tracking, tone, tint = 'Tracking inaktiv', T.MUTE, T.SURFACE_2
+        running = self.live_engine.running
+        tracking, tone, tint = ('Live-Erkennung aktiv', T.WARN, T.TINT_WARN) if running else (
+            'Replay automatisch', T.CYAN, T.TINT_CYAN)
         self.live_state.set(tracking, tone, tint)
         self.dash_state.set(tracking, tone, tint)
         self.dash_counts.set(f'{vision_count} visuell erkannt'
                              + (f' · Squad {squad_total}' if members else '')
                              + (' · vorläufig' if current else ''))
-        self.live_sub.set(
-            f'Runde #{current} · {len(members)} Spieler · Squad {squad_total} Truhen'
-            if current else 'Starte ein Match oder eine neue Squad-Runde.')
-        self.update_vision_panel(running)
-        if self.visual_bridge.running:
-            bridge = self.visual_bridge
-            if bridge.error:
-                self.visual_status.set('Fehler beim Lesen', T.BAD, T.TINT_BAD)
-                self.visual_info.set(bridge.error)
-            else:
-                self.visual_status.set('Visuell aktiv · geschätzt', T.WARN, T.TINT_WARN)
-                self.visual_info.set(
-                    f'{bridge.state} · {bridge.estimated} APPROX / '
-                    f'{bridge.certain} CERTAIN in dieser Runde · '
-                    'letzter Fund: ' +
-                    ago(None if bridge.last_event_at is None else
-                        time.monotonic() - bridge.last_event_at))
+        engine = self.live_engine
+        if running:
+            self.live_state.set('Live aktiv', T.WARN, T.TINT_WARN)
+            self.live_info.set(engine.state +
+                               (f' · {engine.certain} sicher erkannt' if engine.count else ''))
+        elif engine.error:
+            self.live_state.set('Fehler', T.BAD, T.TINT_BAD)
+            self.live_info.set(engine.error)
+            self.live_button.set_label('Live-Test starten', icon='play')
+        else:
+            self.live_state.set('Replay automatisch', T.CYAN, T.TINT_CYAN)
+            self.live_info.set(self.core.replay_engine.status)
+            self.live_button.set_label('Live-Test starten', icon='play')
+
+        self.dash_event.set(engine.state if running else self.core.replay_engine.status)
 
         # -- history / squad ----------------------------------------------
         self.history_stats['matches'].set(data.get('total_matches', 0))
@@ -3568,31 +3140,6 @@ class Gui:
 
         self.handle_events(events)
         self.root.after(2500 if self._idle else 1000, self.refresh)
-
-    def update_vision_panel(self, running):
-        detector = self.vision
-        if detector is None:
-            self.vision_meter.set(0)
-            return
-        if getattr(detector, 'error', ''):
-            self.vision_state.set('Fehler', T.BAD, T.TINT_BAD)
-            self.vision_detail.set(detector.error)
-            self.vision_meter.set(0, T.BAD)
-            return
-        if not running:
-            self.vision_meter.set(0)
-            return
-        score = float(getattr(detector, 'last_score', 0.0) or 0.0)
-        threshold = float(getattr(detector, 'threshold', 0.86) or 0.86)
-        self.vision_meter.set(min(1.0, score / threshold) if threshold else 0,
-                              T.OK if score >= threshold else T.WARN)
-        last_at = getattr(detector, 'last_event_at', None)
-        last_text = getattr(detector, 'last_event_text', '') or 'noch kein Ereignis'
-        since = ago(None if not last_at else time.monotonic() - last_at)
-        detail = (f'{detector.state}  ·  Treffer {score:.2f} / {threshold:.2f}  ·  '
-                  f'{detector.count} vorläufige Truhen  ·  {detector.perf_ms:.0f} ms/Bild')
-        self.vision_detail.set(detail + f'\nLetztes Ereignis: {last_text} ({since})')
-        self.dash_event.set(f'Letztes erkanntes Ereignis: {last_text} ({since})')
 
     def handle_events(self, events):
         for kind, message in events:
@@ -3647,9 +3194,7 @@ class Gui:
 
     # ---- lifecycle -----------------------------------------------------
     def close(self):
-        self.visual_bridge.stop()
-        if self.vision:
-            self.vision.stop_now()
+        self.live_engine.stop()
         self.stop_hotkeys()
         self.hud.hide()
         self.core.shutdown()
@@ -3671,11 +3216,6 @@ def main():
         config = read_json(CONFIG, {})
         if not config.get('server_url') or not config.get('token'):
             raise SystemExit('Zuerst STARTEN.cmd verwenden und verbinden.')
-        exe = chestcounter_exe(config)
-        if exe:
-            result = subprocess.run([str(exe), '--once'], timeout=200)
-            if result.returncode:
-                raise SystemExit('ChestCounter Exit ' + str(result.returncode))
         count, state = sync_once(config)
         print('Fertig:', count, 'Replay-Datensaetze; Runde:',
               (state.get('round') or {}).get('id', '-'))

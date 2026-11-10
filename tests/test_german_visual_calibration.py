@@ -120,11 +120,14 @@ class CalibrationTests(unittest.TestCase):
     def test_client_features_preserved_and_no_new_update_files(self):
         app = (CLIENT / 'app.py').read_text(encoding='utf-8')
         update = (CLIENT / 'update_manager.py').read_text(encoding='utf-8')
-        self.assertIn('Deutsch kalibrieren', app)
-        self.assertIn('Deutsch zurücksetzen', app)
-        self.assertIn('def calibrate_visual_german(self):', app)
-        self.assertIn('Visueller Kistenzähler · Live-Test', app)
-        self.assertIn('self.visual_bridge.poll()', app)
+        # 1.5.4 uses the already calibrated private template automatically;
+        # the user sees no extra external-counter setup UI.
+        self.assertNotIn('Deutsch kalibrieren', app)
+        self.assertNotIn('OBS-Ordner wählen', app)
+        self.assertIn('def toggle_integrated_live(self):', app)
+        self.assertIn('self.live_engine = ManagedLiveEngine(self.core)', app)
+        self.assertIn('def adopt_german_template(self, previous_obs):',
+                      (CLIENT / 'vision.py').read_text(encoding='utf-8'))
         self.assertIn('ALLOWED_FILES', update)
         self.assertNotIn('de_template.npy', update)
 

@@ -12,6 +12,7 @@ import urllib.request
 from pathlib import Path
 from urllib.parse import urlsplit
 from replay_reader import load_matches, fingerprint
+from vision import ManagedReplayEngine
 
 APPDIR=Path(os.getenv('APPDATA') or str(Path.home()))/'SquadLootClient'
 CONFIG=APPDIR/'config.json'
@@ -180,6 +181,7 @@ class Core:
         self.connected=False
         self.stop=threading.Event()
         self.vision_worker=None
+        self.replay_engine=ManagedReplayEngine(self)
 
     def credentials(self):
         return Api(self.config['server_url'],self.config['token'],
@@ -306,6 +308,7 @@ class Core:
         if not self.config.get('server_url') or not self.config.get('token'):
             raise ValueError('Zuerst die Server-URL und den Token eintragen.')
         if self.stop.is_set():self.stop.clear()
+        self.replay_engine.start()
         if not getattr(self,'worker',None) or not self.worker.is_alive():
             self.worker=threading.Thread(target=self.worker_loop,daemon=True)
             self.worker.start()
@@ -316,6 +319,8 @@ class Core:
 
 def sync_once(config):
     core=Core(config=config)
+    if not core.replay_engine.scan_once(force=True) and core.replay_engine.error:
+        raise RuntimeError(core.replay_engine.error)
     api=core.credentials()
     count=core.sync_matches(api,max_items=100000)
     state=api.call('/api/state')

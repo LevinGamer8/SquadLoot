@@ -104,6 +104,49 @@ jobs:
               assert test.returncode == 0, ('Patched runtime failed', test.stderr[-1000:])
               print('Visual runtime FPS capture patch verified')
           PY
+      - name: Check patched live detector captures actual Windows desktop frames
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+          import subprocess
+          import sys
+          import tempfile
+          import time
+          sys.path.insert(0, 'SquadLoot-Windows-Client')
+          from vision import ManagedComponentStore
+          with tempfile.TemporaryDirectory(prefix='squadloot-live-ci-') as tmp:
+              root = pathlib.Path(tmp)
+              store = ManagedComponentStore(root=root)
+              live = store.ensure_visual()
+              store.tune_visual_capture()
+              cfg = root / 'live.toml'
+              cfg.write_text('[detector]\nlanguages = ["en"]\nprocess_fps = 10\n[logging]\nenabled = false\n[capture]\nmode = "off"\n',
+                             encoding='utf-8')
+              env = os.environ.copy()
+              env['PATH'] = str(live / 'runtime/ffmpeg') + os.pathsep + env.get('PATH', '')
+              args = [str(store.visual_python()), '-m', 'fortnite_chest_counter',
+                      'live', '--gui', '--source', 'desktop', '--monitor', '1',
+                      '--config', str(cfg), '--state', str(root / 'test-state.json'),
+                      '--obs-dir', str(root / 'obs')]
+              proc = subprocess.Popen(args, cwd=live, env=env,
+                                      stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE)
+              try:
+                  time.sleep(6)
+                  if proc.poll() is None:
+                      proc.stdin.write(b'stop\n')
+                      proc.stdin.flush()
+                  out, err = proc.communicate(timeout=35)
+              finally:
+                  if proc.poll() is None:
+                      proc.kill()
+              assert proc.returncode == 0, ('Worker exit', proc.returncode, err[-1500:])
+              assert b'"type": "connected"' in out, ('Capture never connected', out[-1500:], err[-1500:])
+              assert b'"type": "status"' in out, ('No processed frames', out[-1500:], err[-1500:])
+              print('Patched live detector connected, processed frames, and stopped cleanly')
+          PY
       - name: Windows monitor detection and GDI preview smoke test
         shell: bash
         run: |

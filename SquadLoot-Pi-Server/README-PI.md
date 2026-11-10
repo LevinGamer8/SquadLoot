@@ -367,3 +367,13 @@ haben einen neutralen Fallback.
 inklusive automatischer Clientpaket-Veröffentlichung aus. Bereits konfigurierte
 Windows-Clients erhalten das neue Design über die bestehende Update-API beim
 nächsten Neustart. Ein Eingriff in SQLite oder Cloudflare ist nicht notwendig.
+
+
+## SquadLoot v1.5.0: Auto-Update und externer Live-Test
+
+Pi und Clients laden dieselbe Release-Version per GitHub-/Pi-Self-Updater.
+Auf dem Pi bleiben SQLite, Matcharchiv und CSV unveraendert. Der neue
+visuelle Test laeuft nur auf einzelnen Windows-Clients und liest zwei lokale
+Dateien einer separat installierten App; auf dem Pi laufen keine Modelle
+oder Bildschirm-Scans. Die externen APPX-Zahlen werden nur vorlaeufig
+synchronisiert und spaeter durch das Replay bestaetigt.

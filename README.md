@@ -4,6 +4,26 @@ SquadLoot hostet eure Fortnite-Truhenstatistiken lokal auf dem Raspberry Pi.
 Der Code ist als öffentliche Release-Quelle gedacht; **keine echten Zugangsdaten
 werden in Git gespeichert**.
 
+## SquadLoot v1.5.0: Mini-HUD und visueller Live-Test
+
+* Claudes kompaktes, klickdurchlässiges **188 x 60 px Mini-HUD** (Standardmodus),
+  optional erweiterbar mit Squad-Spielern; verschiebbar, skalierbar und mit
+  konfigurierbarer Transparenz. Standardmäßig AUS.
+* Optionaler **Fortnite Visual Chest Counter** (externe MIT-Open-Source-App):
+  In Live-Tracking den **obs_output**-Ordner auswählen und den Test starten.
+  SquadLoot liest nur neue CERTAIN-/APPROX-Deltas, nicht Videodaten.
+* Die externe App wird **nicht** mit SquadLoot ausgeliefert und muss zum Test
+  separat aus ihrem offiziellen GitHub Release heruntergeladen werden.
+* Dokumentation und Testanleitung: [Visuellen Live-Test durchführen](docs/VISUAL-LIVE-TEST.md).
+* Das vollständige Matcharchiv, CSV und die originalen Fortnite-Bilder aus 1.3.1
+  bleiben auf dem Pi unverändert erhalten.
+
+### Echtes HUD von Claude
+
+![Kompaktes HUD](docs/screenshots/hud-compact.png)
+
+![Erweitertes HUD](docs/screenshots/hud-expanded.png)
+
 ## Daten und Bilder
 
 Der Pi verwendet dasselbe persistente Docker-Volume wie v1.3.1. **Bereits

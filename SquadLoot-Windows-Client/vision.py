@@ -692,6 +692,11 @@ class ManagedComponentStore:
                     continue
                 name = member.filename
                 parts = _safe_archive_member(name)
+                # The *official* v0.2.3 GitHub ZIP has a fixed versioned
+                # top-level folder; normalize it before applying the allowlist.
+                if (parts[0] == 'Fortnite-Visual-Chest-Counter-v0.2.3' and
+                        len(parts) > 1):
+                    parts = parts[1:]
                 if parts[0] != 'runtime':
                     continue
                 mode = (member.external_attr >> 16) & 0o170000
@@ -699,7 +704,8 @@ class ManagedComponentStore:
                     raise ValueError('Komponentenarchiv enthält unerlaubten Dateityp.')
                 if len(parts) < 3 or parts[1] not in ('python', 'lib', 'ffmpeg'):
                     continue
-                if name in present:
+                normalized_name = '/'.join(parts)
+                if normalized_name in present:
                     raise ValueError('Doppelte Datei im Komponentenarchiv.')
                 count += 1
                 total += member.file_size
@@ -709,7 +715,7 @@ class ManagedComponentStore:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 with z.open(member) as src, open(target, 'wb') as dst:
                     _shutil2.copyfileobj(src, dst, 1024 * 1024)
-                present.add(name)
+                present.add(normalized_name)
         required = (
             Path(destination) / 'runtime/python/python.exe',
             Path(destination) / 'runtime/lib/fortnite_chest_counter/counter.py',

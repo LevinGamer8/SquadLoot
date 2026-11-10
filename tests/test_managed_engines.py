@@ -98,6 +98,21 @@ class ManagedPackageTests(unittest.TestCase):
         self.assertEqual(_safe_archive_member('runtime/python/python.exe'),
                          ['runtime','python','python.exe'])
 
+    def test_official_versioned_zip_wrapper_is_unwrapped(self):
+        prefix='Fortnite-Visual-Chest-Counter-v0.2.3/'
+        with tempfile.TemporaryDirectory() as tmp:
+            z=Path(tmp)/'official.zip'
+            out=Path(tmp)/'extracted'
+            with zipfile.ZipFile(z,'w') as archive:
+                archive.writestr(prefix+'runtime/python/python.exe',b'python')
+                archive.writestr(prefix+'runtime/lib/fortnite_chest_counter/counter.py',b'code')
+                archive.writestr(prefix+'runtime/ffmpeg/ffmpeg.exe',b'ffmpeg')
+                archive.writestr(prefix+'Fortnite Visual Chest Counter.exe',b'GUI excluded')
+            ManagedComponentStore.unpack_visual_zip(z,out)
+            self.assertTrue((out/'runtime/python/python.exe').is_file())
+            self.assertTrue((out/'runtime/ffmpeg/ffmpeg.exe').is_file())
+            self.assertFalse((out/'Fortnite Visual Chest Counter.exe').exists())
+
     def test_extraction_needs_real_runtime_members_and_denies_traversal(self):
         with tempfile.TemporaryDirectory() as tmp:
             z=Path(tmp)/'valid.zip'

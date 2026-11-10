@@ -66,6 +66,17 @@ jobs:
                                     text=True, errors='replace', timeout=40)
               assert test.returncode == 0, ('Replay failed', test.stderr[-1000:])
               print('Replay CLI --help verified')
+              demos = pathlib.Path(temp) / 'empty-demos'
+              data = pathlib.Path(temp) / 'replay-data'
+              demos.mkdir()
+              data.mkdir()
+              test = subprocess.run(
+                  [str(replay), '--once', '--data', str(data),
+                   '--demos', str(demos), '--lang', 'en'],
+                  capture_output=True, text=True, errors='replace', timeout=65)
+              assert test.returncode == 0, ('Passive --once failed',
+                                            test.stderr[-1200:], test.stdout[-1200:])
+              print('Passive Replay --once verified with empty demos')
               live = store.ensure_visual()
               py = store.visual_python()
               assert py.is_file()

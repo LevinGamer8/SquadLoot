@@ -377,3 +377,13 @@ visuelle Test laeuft nur auf einzelnen Windows-Clients und liest zwei lokale
 Dateien einer separat installierten App; auf dem Pi laufen keine Modelle
 oder Bildschirm-Scans. Die externen APPX-Zahlen werden nur vorlaeufig
 synchronisiert und spaeter durch das Replay bestaetigt.
+
+
+## SquadLoot 1.5.2 – ohne manuelle Zählbuttons
+
+Ausschließlich die Darstellung des Windows-Clients und ein erläuternder
+Absatz des Web-Dashboards wurden angepasst. SQLite, REST-API,
+Archiv/CSV und gespeicherte Matches bleiben unverändert. Der alte
+manuelle API-Wert wird weiterhin für bestehende Clients akzeptiert,
+während aktualisierte Windows-Clients keine Plus-/Minus-Zählung mehr
+anbieten. Die Visual-Counter-Integration bleibt nutzbar.

@@ -66,12 +66,8 @@ class AutomaticOnlyInterfaceTests(unittest.TestCase):
         win = (WINDOWS / 'VERSION').read_text(encoding='ascii').strip()
         pi = (ROOT / 'SquadLoot-Pi-Server' / 'VERSION').read_text(encoding='ascii').strip()
         self.assertEqual(win, pi)
-        self.assertTrue(all(part.isdigit() for part in win.split('.')) and len(win.split('.')) == 3)
-
-
-if __name__ == '__main__':
-    unittest.main()
-)
+        self.assertEqual(len(win.split('.')), 3)
+        self.assertTrue(all(part.isdigit() for part in win.split('.')))
 
 
 if __name__ == '__main__':

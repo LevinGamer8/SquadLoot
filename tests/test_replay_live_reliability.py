@@ -15,7 +15,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'SquadLoot-Windows-Client'))
 from client_core import Core
-from vision import (ManagedLiveEngine, ManagedReplayEngine,
+from vision import (ManagedComponentStore, ManagedLiveEngine, ManagedReplayEngine,
                     _best_monitor_for_windows, _ppm_from_bgra,
                     managed_replay_data_file)
 
@@ -128,6 +128,7 @@ class TestManagedLiveWorker(unittest.TestCase):
                 config={'live_monitor': 2}, lock=threading.RLock(),
                 vision=0, last_live=0, round_id=2)
             class Store:
+                def install_loot_popup(self): return True
                 def ensure_visual(self, **kwargs):
                     return root
                 def visual_python(self):
@@ -161,6 +162,7 @@ class TestManagedLiveWorker(unittest.TestCase):
                 config={'live_monitor': 'auto'}, lock=threading.RLock(),
                 vision=0, last_live=0, round_id=2)
             class Store:
+                def install_loot_popup(self): return True
                 def ensure_visual(self, **kwargs):
                     return root
                 def visual_python(self):
@@ -180,6 +182,144 @@ class TestManagedLiveWorker(unittest.TestCase):
             self.assertEqual(engine.state, 'Fehler')
             self.assertIn('ohne Monitor-Verbindung', engine.error)
 
+
+
+class TestCapturePerformance(unittest.TestCase):
+    def test_patch_exact_original_and_preserve_backup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ManagedComponentStore(root=Path(tmp))
+            source = (store.visual_root() / 'runtime/lib/fortnite_chest_counter'
+                      / 'input/video_sources.py')
+            source.parent.mkdir(parents=True, exist_ok=True)
+            original = 'args = ["-framerate", "30", "-offset_x", str(x)]\n'
+            source.write_text(original, encoding='utf-8')
+            cache = source.parent / '__pycache__'
+            cache.mkdir()
+            stale = cache / 'video_sources.cpython-313.pyc'
+            stale.write_bytes(b'official unchecked-hash bytecode')
+            self.assertTrue(store.tune_visual_capture())
+            self.assertFalse(stale.exists(), 'the source patch must invalidate unchecked bytecode')
+            updated = source.read_text(encoding='utf-8')
+            self.assertIn('"-framerate", str(fps)', updated)
+            # Also purge any old cache if the patched source was already there.
+            stale.write_bytes(b'old cache')
+            self.assertFalse(store.tune_visual_capture())
+            self.assertFalse(stale.exists())
+            self.assertEqual(source.with_name(
+                'video_sources.py.squadloot-original').read_text(encoding='utf-8'), original)
+            compile(updated, str(source), 'exec')
+
+    def test_reject_unrecognized_engine_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ManagedComponentStore(root=Path(tmp))
+            source = (store.visual_root() / 'runtime/lib/fortnite_chest_counter'
+                      / 'input/video_sources.py')
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text('raise RuntimeError("other version")\n', encoding='utf-8')
+            with self.assertRaisesRegex(RuntimeError, 'Unbekannte'):
+                store.tune_visual_capture()
+
+
+class TestExpandedLive(unittest.TestCase):
+    def test_english_rate_telemetry_and_types(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            core = SimpleNamespace(config={'live_language':'en','live_process_fps':20,
+                'live_monitor':2,'live_diagnostics':False}, lock=threading.RLock(),
+                live_wake=threading.Event(), vision=0, last_live=0, round_id=2)
+            class Store:
+                def install_loot_popup(self): return True
+                def ensure_visual(self, **kw): return root
+                def tune_visual_capture(self): return True
+                def german_available(self): return False
+                def visual_python(self): return root / 'python.exe'
+            class Process:
+                stdout = [
+                    b'{"type":"connected","source":"desktop: monitor 2"}\n',
+                    b'{"type":"event","verdict":"approx","approx":1,"certain":0}\n',
+                    b'{"type":"counts","approx":1,"certain":0}\n',
+                    b'{"type":"types","breakdown":{"normal":{"approx":1,"certain":0}}}\n',
+                    b'{"type":"status","fps":19.8,"ms_per_frame":13.5,"dropped":3}\n']
+                def wait(self, timeout=None): return 0
+                def poll(self): return 0
+            engine = ManagedLiveEngine(core, store=Store())
+            with patch('vision._subprocess2.Popen', return_value=Process()):
+                engine._run()
+            self.assertEqual(core.vision, 1)
+            self.assertTrue(core.live_wake.is_set())
+            self.assertEqual(engine.fps, 19.8)
+            self.assertEqual(engine.frame_ms, 13.5)
+            self.assertEqual(engine.dropped, 3)
+            self.assertEqual(engine.chest_types['normal'], 1)
+            cfg=(root/'squadloot-live.toml').read_text(encoding='utf-8')
+            self.assertIn('process_fps = 20', cfg)
+            self.assertIn('languages = ["en"]', cfg)
+            self.assertIn('mode = "off"', cfg)
+
+    def test_de_requires_genuine_popup_template(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            core=SimpleNamespace(config={'live_language':'de','live_monitor':2},
+                  lock=threading.RLock(), vision=0,last_live=0,round_id=1)
+            class Store:
+                def install_loot_popup(self): return True
+                def ensure_visual(self, **kw): return Path(tmp)
+                def tune_visual_capture(self): return True
+                def german_available(self): return False
+            engine=ManagedLiveEngine(core,store=Store())
+            engine._run()
+            self.assertEqual(engine.state,'Fehler')
+            self.assertIn('TRUHE-Popup-Muster',engine.error)
+
+    def test_diagnostic_recording_opt_in_and_type_markers(self):
+        import io
+        core=SimpleNamespace(config={},lock=threading.RLock(),
+              vision=0,round_id=1,last_live=0)
+        engine=ManagedLiveEngine(core)
+        class Process:
+            def __init__(self): self.stdin=io.BytesIO()
+            def poll(self): return None
+        process=Process()
+        engine.state='Live-Tracking aktiv'
+        engine.process=process
+        self.assertFalse(engine.mark_missed('food'))
+        self.assertTrue(engine.set_diagnostics(True))
+        self.assertTrue(engine.mark_missed('food'))
+        self.assertTrue(engine.mark_missed('destroyed'))
+        self.assertTrue(engine.set_diagnostics(False))
+        self.assertEqual(process.stdin.getvalue(),
+            b'capture marks\nmark food box\nmark chest destroyed\ncapture off\n')
+
+
+
+class TestReplayContainerCategories(unittest.TestCase):
+    def test_verified_replay_separates_destroyed_ammo_food_and_other(self):
+        from replay_reader import match_to_payload
+        record = {
+            'SessionId': 'mixed-categories',
+            'ReplayFile': 'match.replay',
+            'PlayerName': 'Tester',
+            'IsBattleRoyale': True,
+            'ChestsOpened': 3,
+            'Chests': [
+                {'Kind': 'Coffre', 'Destroyed': False},
+                {'Kind': 'Coffre rare', 'Destroyed': True},
+                {'Kind': 'Coffre', 'Destroyed': True}],
+            'AmmoBoxesOpened': 7,
+            'OtherContainersOpened': 9,
+            'OtherInteractions': {
+                'Caisse de munitions': 7,
+                'Caisse de nourriture': 4,
+                'Autre conteneur': 5,
+            },
+        }
+        result = match_to_payload(record, 'pc')
+        self.assertEqual(result['chests'], 3)
+        self.assertEqual(result['destroyed'], 2)
+        self.assertEqual(result['ammo'], 7)
+        self.assertEqual(result['food'], 4)
+        self.assertEqual(result['other'], 5)
+        self.assertEqual(result['kinds']['Coffre rare'], 1)
+        self.assertEqual(result['kinds']['Autre conteneur'], 5)
 
 class TestReplayExtra(unittest.TestCase):
     def test_custom_legacy_json_basename_uses_actual_managed_output(self):

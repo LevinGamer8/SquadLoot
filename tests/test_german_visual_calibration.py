@@ -73,7 +73,14 @@ class CalibrationTests(unittest.TestCase):
 
     def test_patch_is_explicit_backup_and_reversible(self):
         matrix = vision.german_word_mask(FakePhoto(), (800, 210, 836, 231))
+        for module in (self.visual, self.settings):
+            cache = module.parent / '__pycache__'
+            cache.mkdir(exist_ok=True)
+            (cache / (module.stem + '.cpython-313.pyc')).write_bytes(b'unchecked original')
         result = vision.install_german_visual_template(self.obs, matrix)
+        for module in (self.visual, self.settings):
+            self.assertFalse((module.parent / '__pycache__' /
+                              (module.stem + '.cpython-313.pyc')).exists())
         self.assertTrue(result['fresh'])
         self.assertEqual(result['width'], 25)
         self.assertEqual(result['height'], 10)
@@ -88,8 +95,14 @@ class CalibrationTests(unittest.TestCase):
         original = (self.root / '.squadloot-german-backup' / 'visual.py')
         self.assertEqual(original.read_text(encoding='utf-8'),
                          self.original_visual)
+        for module in (self.visual, self.settings):
+            (module.parent / '__pycache__' /
+             (module.stem + '.cpython-313.pyc')).write_bytes(b'unchecked patched')
         result_again = vision.install_german_visual_template(self.obs, matrix)
         self.assertFalse(result_again['fresh'])
+        for module in (self.visual, self.settings):
+            self.assertFalse((module.parent / '__pycache__' /
+                              (module.stem + '.cpython-313.pyc')).exists())
         self.assertEqual(self.visual.read_text(encoding='utf-8'), patched)
         vision.restore_german_visual_template(self.obs)
         self.assertEqual(self.visual.read_text(encoding='utf-8'),
@@ -122,7 +135,8 @@ class CalibrationTests(unittest.TestCase):
         update = (CLIENT / 'update_manager.py').read_text(encoding='utf-8')
         # 1.5.4 uses the already calibrated private template automatically;
         # the user sees no extra external-counter setup UI.
-        self.assertNotIn('Deutsch kalibrieren', app)
+        # The new German calibration lives inside SquadLoot, not an external setup.
+        self.assertIn('def configure_german_live(self):', app)
         self.assertNotIn('OBS-Ordner wählen', app)
         self.assertIn('def toggle_integrated_live(self):', app)
         self.assertIn('self.live_engine = ManagedLiveEngine(self.core)', app)

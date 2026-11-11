@@ -62,5 +62,5 @@ jobs:
             exit 0
           fi
           gh release create "$TAG" dist/*.zip dist/latest.json dist/SQUADLOOT_INSTALLIEREN.* \
-            --target "$GITHUB_SHA" --latest --title "SquadLoot $TAG" \
-            --notes "SquadLoot $TAG: Automatic passive Replay analysis and one-click optional live tracking with headless, SHA256-pinned analysis runtimes. Existing match data are preserved. German live recognition needs a verified template on new PCs; Windows/Fortnite validation remains pending."
+            --target "$GITHUB_SHA" --latest --title "SquadLoot $TAG – experimentelles Live-Test-Update" \
+            --notes "SquadLoot $TAG: Experimenteller, optionaler englischer Live-Popup-Detektor fuer CHEST, AMMO BOX und PRODUCE BOX sowie Leistungsprofile und lokaler Testbericht. Automatische Replay-Auswertung unveraendert. Zerstoerte Truhen nur durch Replays, Deutsch noch nicht validiert. Live-Erkennung und Fortnite-FPS muessen in echten Matches getestet werden."

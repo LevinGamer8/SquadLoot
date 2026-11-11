@@ -47,7 +47,8 @@ def default_config():
             'hud_locked':True,'hud_x':None,'hud_y':None,
             'hud_hotkey_toggle':'Ctrl+Alt+H','hud_hotkey_lock':'Ctrl+Alt+L',
             'hud_hotkey_mode':'Ctrl+Alt+E',
-            'visual_counter_dir':''}
+            'visual_counter_dir':'',
+            'live_language':'en', 'live_process_fps':15, 'live_diagnostics':False}
 
 
 def validate_url(url):
@@ -189,6 +190,7 @@ class Core:
         self.last_sync_error=''
         self.connected=False
         self.stop=threading.Event()
+        self.live_wake=threading.Event()
         self.vision_worker=None
         self.replay_engine=ManagedReplayEngine(self)
 
@@ -346,20 +348,20 @@ class Core:
             except Exception as exc:
                 failures.append('Rundenzuordnung: '+str(exc)[:140])
             self.last_replay_scan=now
-        if now-self.last_full_read>=8:
+        if now-self.last_full_read>=3.5:
             try:
                 n=self.sync_matches(api,max_items=30)
                 if n:self.set_status(f'{n} neue/aktualisierte Replays übertragen')
             except Exception as exc:
                 failures.append('Replay-Upload: '+str(exc)[:140])
             self.last_full_read=now
-        if self.round_id and (now-self.last_live>=1.5 or now-self.last_push>=15):
+        if self.round_id and (now-self.last_live>=0.8 or now-self.last_push>=15):
             try:
                 self.send_live(api)
                 self.last_live=now
             except Exception as exc:
                 failures.append('Live-Upload: '+str(exc)[:140])
-        if now-self.last_state>=2:
+        if now-self.last_state>=1.1:
             try:
                 state=api.call('/api/state')
                 with self.lock:
@@ -388,7 +390,8 @@ class Core:
             except Exception as ex:
                 self.connected=False
                 self.set_status('Fehler: '+str(ex)[:170])
-            self.stop.wait(1.2)
+            self.live_wake.wait(0.5)
+            self.live_wake.clear()
 
     def start(self):
         if not self.config.get('server_url') or not self.config.get('token'):
@@ -401,6 +404,7 @@ class Core:
 
     def shutdown(self):
         self.stop.set()
+        self.live_wake.set()
 
 
 def sync_once(config):

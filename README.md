@@ -4,6 +4,28 @@ SquadLoot hostet eure Fortnite-Truhenstatistiken lokal auf dem Raspberry Pi.
 Der Code ist als öffentliche Release-Quelle gedacht; **keine echten Zugangsdaten
 werden in Git gespeichert**.
 
+## SquadLoot v1.5.6 – Live-Erkennung zum Testen (experimentell)
+
+Dieses Update wird auf Wunsch des Nutzers ueber den normalen
+Pi-/Windows-Updater verteilt, damit Live-Tests einfacher sind.
+**Die neuen Live-Kategorien sind noch nicht als vollstaendig zuverlaessig
+validiert.** Standardmaessig bleibt die automatische Replay-Analyse aktiv;
+die leistungshungrigere Live-Bildanalyse startet nur nach Klick.
+
+Neu: 10/15/20 FPS Profile, Statusanzeige fuer Bildrate/Verarbeitung,
+sparsamere Bildschirmaufnahme, englische Popup-Erkennung fuer Munitions-
+und Obstkisten (zusätzlich zu Truhen) und lokaler Testbericht.
+Zerstoerte Truhen werden nur im Replay bestaetigt, deutsche Popup-Muster
+muessen auf echten deutschen Spielvideos kalibriert und geprueft werden.
+**Gameplay-Aufnahmen werden nicht automatisch zum Pi uebertragen.**
+
+**Testen:** Nach dem Update im Live-Tracking Monitor und Sprache waehlen,
+zuerst 10 FPS ausprobieren, eine Partie spielen und die Live-Anzeige gegen
+die eigenen Aktionen sowie Fortnite-FPS mit/ohne Live-Test abgleichen.
+Danach auf „Lokalen Testbericht speichern“ klicken und die Datei unter
+`%LOCALAPPDATA%\\SquadLoot\\LiveBetaTestbericht.txt` weitergeben.
+Keine Zugangsdaten fuer den Bericht erforderlich.
+
 ## SquadLoot v1.5.5 – Monitorvorschau und zuverlässiger Replay-Abgleich
 
 **Live-Tracking → Bildschirmquelle** bietet jetzt *Automatisch (Fortnite-Fenster

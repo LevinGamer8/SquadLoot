@@ -21,6 +21,7 @@ import os
 import queue
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import webbrowser
@@ -31,8 +32,10 @@ from tkinter import filedialog, font as tkfont, messagebox
 
 from client_core import (Core, CONFIG, read_json, sync_once, validate_url)
 from update_manager import current_version, check_and_stage, log_error
-from vision import (ManagedLiveEngine, list_capture_monitors,
-                    detect_fortnite_monitor, capture_monitor_preview)
+from vision import (ManagedLiveEngine, ManagedComponentStore,
+                    list_capture_monitors, detect_fortnite_monitor,
+                    capture_monitor_preview, normalized_german_screenshot,
+                    german_word_mask, install_german_visual_template)
 
 # --------------------------------------------------------------------------
 # Display scaling
@@ -1797,8 +1800,15 @@ class Gui:
 
     def __init__(self):
         self.core = Core()
+        self.beta_mode = os.getenv('SQUADLOOT_BETA_TEST') == '1'
+        # The regular 1.5.6 updater installs an explicitly experimental
+        # live detector. Expose the same local reporting UI for test sessions.
+        self.live_test_mode = self.beta_mode or current_version() == '1.5.6'
         self.root = tk.Tk()
-        self.root.title('SquadLoot  ·  Fortnite Squad Tracker ' + current_version())
+        self.root.title(
+            'SquadLoot · LOKALE LIVE-BETA (unveröffentlicht)'
+            if self.beta_mode else
+            'SquadLoot  ·  Fortnite Squad Tracker ' + current_version())
         self.root.geometry(f'{px(1300)}x{px(840)}')
         self.root.minsize(px(1060), px(680))
         self.root.configure(bg=T.BG)
@@ -1817,6 +1827,9 @@ class Gui:
         self.monitor_preview_seq = 0
         self.monitor_preview_image = None
         self.live_monitor_values = {}
+        self.live_rate_values = {}
+        self.live_language_values = {}
+        self.calibration_dialog = None
         self.update_busy = False
         self.update_pending = False
         self.pending_version = ''
@@ -2249,6 +2262,16 @@ class Gui:
         tk.Label(panel.body, textvariable=self.live_info, bg=T.SURFACE,
                  fg=T.MUTE, font=font(11), anchor='w', justify='left',
                  wraplength=px(780)).pack(fill='x', pady=(T.S3, 0))
+        if self.live_test_mode:
+            self.live_beta_note = tk.StringVar(
+                value='TESTFUNKTION 1.5.6: XP-Erkennung noch nicht validiert.')
+            tk.Label(panel.body, textvariable=self.live_beta_note,
+                     bg=T.SURFACE, fg=T.ACCENT_HI, font=font(12, 'bold'),
+                     justify='left', anchor='w',
+                     wraplength=px(780)).pack(fill='x', pady=(T.S3, T.S2))
+            Button(panel.body, 'Lokalen Testbericht speichern',
+                   self.export_live_beta_report, 'secondary',
+                   icon='download', bg=T.SURFACE).pack(anchor='w')
 
         source = Card(page, fill=T.SURFACE, border=T.LINE)
         source.pack(fill='x', pady=(T.S2, T.S3))
@@ -2286,6 +2309,111 @@ class Gui:
             px(265), px(153), text='Monitor auswählen und Vorschau anzeigen',
             fill=T.MUTE, font=font(12))
         self.refresh_live_monitors()
+
+        tuning = Card(page, fill=T.SURFACE, border=T.LINE)
+        tuning.pack(fill='x', pady=(0, T.S3))
+        section_head(tuning.body, 'Erkennung & Leistung',
+                     'Änderungen an Sprache und Leistung gelten nach einem Neustart des Live-Tests.',
+                     bg=T.SURFACE)
+        opts = tk.Frame(tuning.body, bg=T.SURFACE)
+        opts.pack(fill='x', pady=(T.S3, 0))
+        lang_col = tk.Frame(opts, bg=T.SURFACE)
+        lang_col.pack(side='left', anchor='n', padx=(0, T.S3))
+        label(lang_col, 'Fortnite-Sprache', 11, fg=T.MUTE,
+              bg=T.SURFACE).pack(anchor='w', pady=(0, T.S1))
+        self.live_language_values = {
+            'Englisch (CHEST)': 'en',
+            'Deutsch (TRUHE · Beta)': 'de',
+        }
+        configured = self.core.config.get('live_language', 'en')
+        lang_title = next((title for title, value in self.live_language_values.items()
+                           if value == configured), 'Englisch (CHEST)')
+        self.live_language_var = tk.StringVar(value=lang_title)
+        lang_opts = tk.OptionMenu(lang_col, self.live_language_var,
+                                  *self.live_language_values.keys(),
+                                  command=self.choose_live_language)
+        lang_opts.configure(bg=T.FIELD, fg=T.TEXT, activebackground=T.SURFACE_3,
+                            activeforeground=T.TEXT, font=font(11), relief='flat',
+                            highlightthickness=0, bd=1, width=25, anchor='w')
+        lang_opts['menu'].configure(bg=T.SURFACE_2, fg=T.TEXT, tearoff=0,
+                                    activebackground=T.ACCENT)
+        lang_opts.pack(anchor='w')
+
+        rate_col = tk.Frame(opts, bg=T.SURFACE)
+        rate_col.pack(side='left', anchor='n')
+        label(rate_col, 'Analysegeschwindigkeit', 11, fg=T.MUTE,
+              bg=T.SURFACE).pack(anchor='w', pady=(0, T.S1))
+        self.live_rate_values = {
+            'Sparsam · 10 fps': 10,
+            'Ausgewogen · 15 fps': 15,
+            'Genauigkeit · 20 fps': 20,
+        }
+        rate = self.core.config.get('live_process_fps', 15)
+        rate_title = next((title for title, value in self.live_rate_values.items()
+                           if value == rate), 'Ausgewogen · 15 fps')
+        self.live_rate_var = tk.StringVar(value=rate_title)
+        rate_opts = tk.OptionMenu(rate_col, self.live_rate_var,
+                                  *self.live_rate_values.keys(),
+                                  command=self.choose_live_rate)
+        rate_opts.configure(bg=T.FIELD, fg=T.TEXT, activebackground=T.SURFACE_3,
+                            activeforeground=T.TEXT, font=font(11), relief='flat',
+                            highlightthickness=0, bd=1, width=25, anchor='w')
+        rate_opts['menu'].configure(bg=T.SURFACE_2, fg=T.TEXT, tearoff=0,
+                                    activebackground=T.ACCENT)
+        rate_opts.pack(anchor='w')
+        label(tuning.body,
+              '10 fps schont den PC, kann aber Kisten übersehen. '
+              '15 fps ist der getestete Ausgangswert; 20 fps verbraucht mehr Leistung.',
+              11, fg=T.MUTE, bg=T.SURFACE, anchor='w',
+              wraplength=px(800), justify='left').pack(fill='x', pady=(T.S3, T.S2))
+        Button(tuning.body, 'Deutsch mit echtem Truhen-Popup kalibrieren',
+               self.configure_german_live, 'secondary', icon='target',
+               bg=T.SURFACE).pack(anchor='w')
+        self.live_kinds_note = tk.StringVar(
+            value='TEST 1.5.6: Englisch erkennt Truhen sowie Munitions-/'
+                  'Obstkisten aus XP-Popups (vorlaeufig). Zerstoerte Truhen '
+                  'nur nach Replay-Analyse. Deutsch braucht Kalibrierung.')
+        label(tuning.body, '', 11, fg=T.MUTE, bg=T.SURFACE,
+              textvariable=self.live_kinds_note, wraplength=px(800),
+              justify='left', anchor='w').pack(fill='x', pady=(T.S2, 0))
+
+        diagnostics = Card(page, fill=T.SURFACE, border=T.LINE)
+        diagnostics.pack(fill='x', pady=(0, T.S4))
+        section_head(diagnostics.body, 'Verpasste Loot-Aktionen prüfen',
+                     'Optionale kurze lokale Diagnose-Clips: beim Spielen markieren, '
+                     'was nicht erkannt wurde. Aufnahme kostet zusätzliche Leistung und Speicher.',
+                     bg=T.SURFACE)
+        self.record_toggle = Toggle(
+            diagnostics.body, 'Diagnoseaufnahme aktivieren (nur lokal)',
+            bool(self.core.config.get('live_diagnostics', False)),
+            self.toggle_live_diagnostics, bg=T.SURFACE)
+        self.record_toggle.pack(anchor='w', pady=(T.S3, T.S3))
+        bottom = tk.Frame(diagnostics.body, bg=T.SURFACE)
+        bottom.pack(fill='x')
+        self.missed_kind_values = {
+            'Truhe geöffnet': 'chest',
+            'Truhe zerstört': 'destroyed',
+            'Munitionskiste': 'ammo',
+            'Obstkiste / Lebensmittel': 'food',
+            'Sonstiger Behälter': 'other',
+        }
+        self.missed_kind_var = tk.StringVar(value='Truhe geöffnet')
+        m = tk.OptionMenu(bottom, self.missed_kind_var,
+                          *self.missed_kind_values.keys())
+        m.configure(bg=T.FIELD, fg=T.TEXT, activebackground=T.SURFACE_3,
+                    activeforeground=T.TEXT, font=font(11), relief='flat',
+                    highlightthickness=0, bd=1, width=28, anchor='w')
+        m['menu'].configure(bg=T.SURFACE_2, fg=T.TEXT,
+                            activebackground=T.ACCENT, tearoff=0)
+        m.pack(side='left', padx=(0, T.S2))
+        Button(bottom, 'Ereignis markieren', self.mark_live_miss,
+               'secondary', icon='film', bg=T.SURFACE).pack(side='left')
+        self.live_diagnostic_note = tk.StringVar(
+            value='Keine Aufnahmen ohne aktivierte Option. '
+                  'Clips bleiben unter %LOCALAPPDATA%\\SquadLoot\\engines.')
+        label(diagnostics.body, '', 11, fg=T.MUTE, bg=T.SURFACE,
+              textvariable=self.live_diagnostic_note, wraplength=px(800),
+              justify='left', anchor='w').pack(fill='x', pady=(T.S2, 0))
 
     # ---- match history -------------------------------------------------
     def build_history(self):
@@ -3033,6 +3161,220 @@ class Gui:
             self.monitor_note.set('Vorschau konnte nicht dargestellt werden: '
                                   + str(exc)[:150])
 
+    # ---- live detector tuning / local diagnostic recordings ----------
+    def choose_live_language(self, title):
+        code = self.live_language_values.get(title, 'en')
+        self.core.set_config({'live_language': code})
+        if code == 'de':
+            self.live_kinds_note.set(
+                'Deutsch benötigt ein kalibriertes echtes TRUHE-Popup. '
+                'Mit dem Button unten ein Muster aus einem Screenshot erstellen.')
+        if self.live_engine.running:
+            self.monitor_note.set(
+                'Neue Sprache gespeichert. Live-Test stoppen und neu starten.')
+
+    def choose_live_rate(self, title):
+        fps = self.live_rate_values.get(title, 15)
+        self.core.set_config({'live_process_fps': fps})
+        if self.live_engine.running:
+            self.monitor_note.set(
+                f'{fps} fps gespeichert. Live-Test stoppen und neu starten.')
+
+    def toggle_live_diagnostics(self, enabled):
+        enabled = bool(enabled)
+        if self.live_engine.running and not self.live_engine.set_diagnostics(enabled):
+            self.live_diagnostic_note.set(
+                'Diagnose konnte nicht umgeschaltet werden. Live-Test neu starten.')
+            return
+        self.core.set_config({'live_diagnostics': enabled})
+        self.live_diagnostic_note.set(
+            ('Diagnoseaufnahme aktiv: Lokale Clips benötigen Rechenleistung '
+             'und Speicherplatz. Für normale Spiele wieder ausschalten.'
+             if enabled else 'Diagnoseaufnahme ausgeschaltet. Keine neuen Clips.'))
+
+    def export_live_beta_report(self):
+        """Save counts and performance numbers only, never user credentials."""
+        if not self.live_test_mode:
+            return
+        from datetime import datetime, timezone
+        with self.core.lock:
+            stats = (self.core.vision, self.core.ammo, self.core.food,
+                     self.core.destroyed)
+        engine = self.live_engine
+        lines = [
+            'SquadLoot 1.5.6 TEST-UPDATE - lokaler Erkennungsbericht',
+            'Erstellt (UTC): ' + datetime.now(timezone.utc).isoformat(timespec='seconds'),
+            'Sprache: ' + str(self.core.config.get('live_language', 'en')),
+            'Analyse-FPS (Soll): ' + str(self.core.config.get('live_process_fps', 15)),
+            'Monitor: ' + str(engine.monitor),
+            'Engine-Status: ' + str(engine.state)[:160],
+            'Fehler: ' + str(engine.error)[:160],
+            'Warnung: ' + str(engine.warning)[:160],
+            'Erreichte Analyse-FPS: %.2f' % engine.fps,
+            'Analysezeit: %.1f ms/Bild' % engine.frame_ms,
+            'Uebersprungene Frames: ' + str(engine.dropped),
+            'Truhen (vorlaeufig): ' + str(stats[0]),
+            'Munitionskisten (vorlaeufig): ' + str(stats[1]),
+            'Lebensmittelkisten (vorlaeufig): ' + str(stats[2]),
+            'Zerstoerte Truhen (Replay bestaetigt): ' + str(stats[3]),
+            'Typen: ' + str(engine.chest_types)[:350],
+            '',
+            'Keine Videos, Tokens, Server-URLs oder Spielernamen.',
+            'Fortnite-FPS bitte separat im Spiel vergleichen.',
+        ]
+        try:
+            out = Path(os.getenv('LOCALAPPDATA') or str(Path.home())) / (
+                'SquadLoot/LiveBetaTestbericht.txt')
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+            messagebox.showinfo('SquadLoot Erkennungstest',
+                'Testbericht lokal gespeichert:\n' + str(out),
+                parent=self.root)
+        except OSError as exc:
+            messagebox.showerror('Testbericht', str(exc)[:220],
+                                 parent=self.root)
+
+    def mark_live_miss(self):
+        category = self.missed_kind_values.get(self.missed_kind_var.get())
+        if self.live_engine.mark_missed(category):
+            self.live_diagnostic_note.set(
+                'Markierung vorgemerkt. Der Clip wird lokal gespeichert; '
+                'Spielbild/Videodaten werden nicht hochgeladen.')
+        else:
+            self.live_diagnostic_note.set(
+                'Zuerst Live-Test und Diagnoseaufnahme einschalten.')
+
+    # ---- screenshot-based German calibration; local-only -------------
+    def configure_german_live(self):
+        if (self.live_engine.running or
+                (self.live_engine.thread is not None and
+                 self.live_engine.thread.is_alive())):
+            messagebox.showwarning(
+                'Deutsch kalibrieren',
+                'Bitte zuerst den Live-Test stoppen. Die Erkennungsdateien '
+                'dürfen nicht während einer laufenden Sitzung verändert werden.')
+            return
+        screenshot = filedialog.askopenfilename(
+            title='Fortnite-Screenshot mit sichtbarem deutschen TRUHE-XP-Popup',
+            filetypes=[('Bilder', '*.png *.jpg *.jpeg *.bmp *.webp'),
+                       ('Alle Dateien', '*.*')])
+        if not screenshot:
+            return
+        self.live_kinds_note.set(
+            'Bereite dein Bild lokal auf · lade ggf. das Visual-Modul herunter …')
+
+        def task():
+            temp_name = None
+            try:
+                store = ManagedComponentStore()
+                root = store.ensure_visual()
+                with tempfile.NamedTemporaryFile(
+                        prefix='squadloot-de-', suffix='.png',
+                        delete=False) as output:
+                    temp_name = output.name
+                normalized_german_screenshot(
+                    root / 'obs_output', screenshot, temp_name)
+                self.events.put(('german_ready', (temp_name, str(root))))
+            except Exception as exc:
+                if temp_name:
+                    Path(temp_name).unlink(missing_ok=True)
+                self.events.put(('german_error', str(exc)[:240]))
+
+        threading.Thread(target=task, daemon=True,
+                         name='SquadLootGermanCalibration').start()
+
+    def show_german_calibration(self, path, root):
+        """Draw the likely XP region at its native 720p size; user selects a word."""
+        source = Path(path)
+        try:
+            photo = tk.PhotoImage(file=str(source))
+            if (photo.width(), photo.height()) != (1280, 720):
+                raise ValueError('Erwartet wird ein auf 1280×720 normiertes Bild.')
+        except (tk.TclError, ValueError) as exc:
+            self.live_kinds_note.set('Kalibrierbild fehlerhaft: ' + str(exc))
+            source.unlink(missing_ok=True)
+            return
+        source.unlink(missing_ok=True)  # photo pixels are now in Tk memory
+        dialog = tk.Toplevel(self.root)
+        self.calibration_dialog = dialog
+        dialog.title('Deutsch kalibrieren – TRUHE markieren')
+        dialog.configure(bg=T.BG)
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        label(dialog, 'Nur das violette Wort TRUHE im XP-Popup auswählen.',
+              14, 'bold', bg=T.BG).pack(anchor='w', padx=T.S4,
+                                         pady=(T.S4, T.S2))
+        label(dialog, 'Falls das Wort nicht zu sehen ist: Screenshot mit '
+              'echter Truhen-XP-Einblendung erstellen und erneut versuchen.',
+              11, fg=T.MUTE, bg=T.BG, justify='left',
+              wraplength=px(800)).pack(anchor='w', padx=T.S4,
+                                        pady=(0, T.S3))
+        # Native-resolution crop covering the expected lavender XP text,
+        # with a fixed offset back into the normalized 1280x720 image.
+        view = tk.PhotoImage(width=720, height=400)
+        view.tk.call(str(view), 'copy', str(photo), '-from',
+                     500, 100, 1220, 500, '-to', 0, 0)
+        canvas = tk.Canvas(dialog, width=720, height=400,
+                           highlightthickness=1, highlightbackground=T.LINE,
+                           bg=T.FIELD)
+        canvas.pack(padx=T.S4)
+        canvas.create_image(0, 0, anchor='nw', image=view)
+        dialog._images = (photo, view)
+        drag = {'start': None, 'rect': None, 'bounds': None}
+
+        def clamp(event):
+            return (max(0, min(719, event.x)),
+                    max(0, min(399, event.y)))
+
+        def begin(event):
+            drag['start'] = clamp(event)
+            if drag['rect']:
+                canvas.delete(drag['rect'])
+                drag['rect'] = None
+
+        def move(event):
+            if drag['start'] is None:
+                return
+            x, y = clamp(event)
+            x0, y0 = drag['start']
+            if drag['rect']:
+                canvas.delete(drag['rect'])
+            drag['rect'] = canvas.create_rectangle(
+                x0, y0, x, y, outline=T.ACCENT_HI, width=2)
+            drag['bounds'] = (min(x0, x) + 500, min(y0, y) + 100,
+                              max(x0, x) + 501, max(y0, y) + 101)
+
+        canvas.bind('<ButtonPress-1>', begin)
+        canvas.bind('<B1-Motion>', move)
+        canvas.bind('<ButtonRelease-1>', move)
+        actions = tk.Frame(dialog, bg=T.BG)
+        actions.pack(fill='x', padx=T.S4, pady=T.S4)
+
+        def save():
+            if not drag['bounds']:
+                messagebox.showwarning('Vorlage fehlt',
+                                       'Markiere nur das Wort TRUHE.', parent=dialog)
+                return
+            try:
+                matrix = german_word_mask(photo, drag['bounds'])
+                install_german_visual_template(Path(root) / 'obs_output', matrix)
+                self.core.set_config({'live_language': 'de'})
+                self.live_language_var.set('Deutsch (TRUHE · Beta)')
+                self.live_kinds_note.set(
+                    'Deutsch-Vorlage installiert. Bitte mit einem echten Match '
+                    'testen; Erkennung bleibt vorläufig Beta.')
+                dialog.destroy()
+                self.calibration_dialog = None
+            except Exception as exc:
+                messagebox.showerror('Deutsch-Kalibrierung',
+                                     str(exc)[:300], parent=dialog)
+
+        Button(actions, 'TRUHE-Muster übernehmen', save,
+               'primary', icon='check', bg=T.BG).pack(side='left')
+        Button(actions, 'Abbrechen', dialog.destroy,
+               'secondary', bg=T.BG).pack(side='left', padx=(T.S2, 0))
+        dialog.lift()
+
     # ---- in-game HUD ---------------------------------------------------
     def toggle_overlay(self):
         """Quick action and menu entry; keeps the historic method name."""
@@ -3216,11 +3558,27 @@ class Gui:
                              + (f' · Squad {squad_total}' if members else '')
                              + (' · vorläufig' if current else ''))
         engine = self.live_engine
+        if self.live_test_mode:
+            self.live_beta_note.set(
+                'TEST 1.5.6 · vorlaeufige Live-Werte: '
+                f'{vision_count} Truhen · {ammo} Munitionskisten · '
+                f'{food} Lebensmittelkisten · '
+                'Zerstoerte Truhen nur aus Replay.')
         if running:
             self.live_state.set('Live aktiv', T.WARN, T.TINT_WARN)
+            metrics = (f' · {engine.fps:.1f} fps · {engine.frame_ms:.0f} ms/Bild'
+                       f' · {engine.dropped} übersprungen' if engine.fps else '')
             self.live_info.set(engine.state +
                                (f' · {engine.certain} sicher erkannt' if engine.count else '') +
+                               metrics +
                                (f' · Hinweis: {engine.warning[:100]}' if engine.warning else ''))
+            found = {k: v for k, v in engine.chest_types.items()
+                     if v > 0 and k != 'unclassified'}
+            if found:
+                self.live_kinds_note.set(
+                    'Erkannte Truhentypen (vorläufig): ' +
+                    ', '.join(f'{k}: {v}' for k, v in sorted(found.items())))
+
         elif engine.error:
             self.live_state.set('Fehler', T.BAD, T.TINT_BAD)
             self.live_info.set(engine.error)
@@ -3266,11 +3624,16 @@ class Gui:
             self.set_status(status, T.OK if connected else T.DIM)
 
         self.handle_events(events)
-        self.root.after(2500 if self._idle else 1000, self.refresh)
+        self.root.after(2500 if self._idle else
+                        (450 if self.live_engine.running else 1000), self.refresh)
 
     def handle_events(self, events):
         for kind, message in events:
-            if kind == 'monitor_preview':
+            if kind == 'german_ready':
+                self.show_german_calibration(*message)
+            elif kind == 'german_error':
+                self.live_kinds_note.set('Kalibrierung fehlgeschlagen: ' + message)
+            elif kind == 'monitor_preview':
                 self._show_live_monitor_preview(*message)
             elif kind == 'monitor_preview_error':
                 sequence, detail = message

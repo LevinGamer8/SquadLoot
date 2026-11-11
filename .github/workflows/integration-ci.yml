@@ -19,6 +19,16 @@ jobs:
         run: python3 -m compileall -q SquadLoot-Pi-Server SquadLoot-Windows-Client
       - name: Tests
         run: xvfb-run -a python3 -m unittest discover -s tests -v
+      - name: Build local-only Live-Beta test ZIP (not a release)
+        if: github.event_name == 'pull_request'
+        run: python3 scripts/build_live_test_bundle.py --output dist/SquadLoot-Live-Beta.zip
+      - name: Upload local-only beta artifact
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SquadLoot-Live-Beta-Test
+          path: dist/SquadLoot-Live-Beta.zip
+          retention-days: 14
       - name: Parse embedded web dashboard JavaScript
         run: |
           python3 - <<'PY'
@@ -46,7 +56,7 @@ jobs:
           PY
 
   windows-managed-engines:
-    if: github.event_name == 'pull_request' && contains(github.head_ref, 'one-click-live-auto-replay')
+    if: github.event_name == 'pull_request' && (contains(github.head_ref, 'one-click-live-auto-replay') || contains(github.head_ref, 'live-performance'))
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -86,6 +96,112 @@ jobs:
                   timeout=45)
               assert test.returncode == 0, ('Live worker failed', test.stderr[-1000:])
               print('Visual headless runtime verified', test.stdout.strip())
+              # Verify the FPS capture patch against the actual pinned v0.2.3
+              # files, not just our mocked Python regression fixture.
+              source = (live / 'runtime/lib/fortnite_chest_counter'
+                        / 'input/video_sources.py')
+              before = source.read_text(encoding='utf-8')
+              assert '"-framerate", "30", "-offset_x"' in before
+              assert store.tune_visual_capture() is True
+              after = source.read_text(encoding='utf-8')
+              assert '"-framerate", str(fps), "-offset_x"' in after
+              compile(after, str(source), 'exec')
+              assert store.tune_visual_capture() is False
+              # Test the REAL pinned upstream counter.py, not only the mock fixture.
+              assert store.install_loot_popup() is True
+              assert store.install_loot_popup() is False
+              source_counter = (live / 'runtime/lib/fortnite_chest_counter/counter.py')
+              assert '# SquadLootLootPopupsV1' in source_counter.read_text(encoding='utf-8')
+              assert source_counter.with_name('counter.py.squadloot-original').is_file()
+              model_smoke = (
+                  'import base64,zlib,numpy as np; '
+                  'from fortnite_chest_counter.squadloot_loot_popup import '
+                  'LootPopupDetector,_WORDS; '
+                  'shape,payload=_WORDS["ammo"]; '
+                  'glyph=np.frombuffer(zlib.decompress(base64.b64decode(payload)),dtype=np.uint8).reshape(shape); '
+                  'frame=np.zeros((720,1280,3),dtype=np.uint8); '
+                  'frame[230:241,869:931]=glyph[:,:,None]*np.array([232,186,242],dtype=np.uint8); '
+                  'det=LootPopupDetector(); '
+                  'assert det.update(0,frame)==[]; '
+                  'events=det.update(.1,frame); '
+                  'assert len(events)==1 and events[0][0]=="ammo",events; '
+                  'print("embedded ammo popup classifier detects 2-frame event",events)'
+              )
+              model_check = subprocess.run(
+                  [str(py), '-c', model_smoke], cwd=live,
+                  capture_output=True, text=True, errors='replace', timeout=40)
+              assert model_check.returncode == 0, ('Embedded popup classifier failed',
+                                                     model_check.stdout,model_check.stderr[-1000:])
+              print(model_check.stdout.strip())
+              test_args = subprocess.run(
+                  [str(py), '-c',
+                   'from fortnite_chest_counter.input.video_sources import make_source; '
+                   's=make_source("desktop",10,monitor=1); '
+                   'a=s.input_args; '
+                   'assert a[a.index("-framerate")+1]=="10", a; '
+                   'print("gdigrab captures at 10 fps")'],
+                  cwd=live, capture_output=True, text=True, errors='replace',
+                  timeout=45)
+              assert test_args.returncode == 0, ('Patched gdigrab args failed',
+                                                 test_args.stdout, test_args.stderr[-1000:])
+              print(test_args.stdout.strip())
+              test = subprocess.run(
+                  [str(py), '-m', 'fortnite_chest_counter', '--version'],
+                  cwd=live, capture_output=True, text=True, errors='replace',
+                  timeout=45)
+              assert test.returncode == 0, ('Patched runtime failed', test.stderr[-1000:])
+              print('Visual runtime FPS capture patch verified')
+          PY
+      - name: Check patched live detector captures actual Windows desktop frames
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          import json
+          import pathlib
+          import subprocess
+          import sys
+          import tempfile
+          import time
+          sys.path.insert(0, 'SquadLoot-Windows-Client')
+          from vision import ManagedComponentStore
+          with tempfile.TemporaryDirectory(prefix='squadloot-live-ci-') as tmp:
+              root = pathlib.Path(tmp)
+              store = ManagedComponentStore(root=root)
+              live = store.ensure_visual()
+              store.tune_visual_capture()
+              store.install_loot_popup()
+              cfg = root / 'live.toml'
+              cfg.write_text('[detector]\nlanguages = ["en"]\nprocess_fps = 10\n[logging]\nenabled = false\n[capture]\nmode = "off"\n',
+                             encoding='utf-8')
+              env = os.environ.copy()
+              env['PATH'] = str(live / 'runtime/ffmpeg') + os.pathsep + env.get('PATH', '')
+              args = [str(store.visual_python()), '-m', 'fortnite_chest_counter',
+                      'live', '--gui', '--source', 'desktop', '--monitor', '1',
+                      '--config', str(cfg), '--state', str(root / 'test-state.json'),
+                      '--obs-dir', str(root / 'obs')]
+              proc = subprocess.Popen(args, cwd=live, env=env,
+                                      stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE)
+              try:
+                  time.sleep(6)
+                  if proc.poll() is None:
+                      proc.stdin.write(b'stop\n')
+                      proc.stdin.flush()
+                  out, err = proc.communicate(timeout=35)
+              finally:
+                  if proc.poll() is None:
+                      proc.kill()
+              assert proc.returncode == 0, ('Worker exit', proc.returncode, err[-1500:])
+              assert b'"type": "connected"' in out, ('Capture never connected', out[-1500:], err[-1500:])
+              events = [json.loads(line) for line in out.splitlines()
+                        if line.strip().startswith(b'{')]
+              stopped = next((row for row in events if row.get('type') == 'stopped'), None)
+              assert stopped is not None, ('No stop summary', out[-1500:], err[-1500:])
+              assert stopped.get('frames_processed', 0) >= 5, ('No processed frames', stopped)
+              print('Patched live detector:', stopped['frames_processed'],
+                    'frames processed, FPS', stopped.get('detector_fps'),
+                    'dropped', stopped.get('frames_dropped'))
           PY
       - name: Windows monitor detection and GDI preview smoke test
         shell: bash

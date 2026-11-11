@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.5.6 – Experimentelles Live-Test-Update (noch nicht fertig validiert)
+
+- Optionale 10/15/20 fps im Live-Tab (Standard 15) und bessere Statusanzeige
+  für die tatsächliche Engine-Frequenz, Verarbeitungszeit und Dropped Frames.
+- Versionstreue, rücksetzbare Capture-Optimierung: FFmpeg `gdigrab`
+  liest nicht mehr unnötig 30 volle Bildschirmbilder bei 10/15 fps ein.
+- Wichtiger Cache-Fix: Der gepinnte VisualCounter bringt vorkompilierte
+  `UNCHECKED_HASH`-Pythonmodule mit. Nach Änderungen an Capture-Quellcode
+  und deutschen Vorlagen werden passende `.pyc` gezielt entfernt, sonst
+  bliebe beim Start der alte Code trotz gepatchter Datei aktiv.
+- Schnellerer, durch Live-Ereignisse weckbarer Netzwerkabgleich.
+- Deutsche TRUHE-Popup-Kalibrierung direkt aus der SquadLoot-Oberfläche.
+- Opt-in lokale Diagnose-Clips für übersehene Truhen, zerstörte Truhen,
+  Munitions-, Obstkisten und sonstige Behälter (standardmäßig aus).
+- Aus 13 vom Nutzer markierten englischen Fortnite-Aktionen wurde ein
+  experimenteller, rein pixelbasierter Live-Detektor fuer AMMO BOX und
+  PRODUCE BOX ergaenzt. Truhen zaehlt weiter die vorhandene Chest-Engine;
+  Zerstoerungen werden nicht aus uneindeutigen Live-Bildern geraten.
+- Der neue Erkenner arbeitet mit dem bereits aufgenommenen 720p-Bild der
+  gepinnten Drittanbieter-Engine. Kein zweites Bildschirmaufnahme-Programm,
+  kein neues OCR, keine Gameplay-Videos oder Spielerdaten im Repository.
+- Live-Tracking zeigt als **TEST 1.5.6** die vorlaeufigen Zähler fuer Truhen,
+  Munition und Lebensmittel. Ein Klick speichert einen lokalen Testbericht
+  mit Zaehlern und Engine-Leistungsdaten ohne Tokens oder Screenshots.
+- Nur die optionale Live-Erkennung ist experimentell. Automatischer Replay-
+  Scan und bestehende Datenbank bleiben unveraendert. Weitere Fehlerbehebungen
+  benoetigen v1.5.7 oder hoeher, da der Auto-Updater semantische Dreier-
+  Versionsnummern und strikt steigende Versionen erfordert.
+- **Noch kein Nachweis fuer alle HUDs, Sprachen, Hardware oder FPS im echten
+  Fortnite.** Deutsch fuer neue Loot-Typen noch nicht validiert.
+  Siehe docs/LIVE-VALIDATION-1.5.6.md.
+
+
 ## 1.5.5 – Monitorvorschau und Replay-/Upload-Zuverlässigkeit
 
 - Automatische Monitorauswahl anhand des sichtbaren Fortnite-Fensters statt

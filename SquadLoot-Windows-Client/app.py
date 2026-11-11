@@ -1800,8 +1800,12 @@ class Gui:
 
     def __init__(self):
         self.core = Core()
+        self.beta_mode = os.getenv('SQUADLOOT_BETA_TEST') == '1'
         self.root = tk.Tk()
-        self.root.title('SquadLoot  ·  Fortnite Squad Tracker ' + current_version())
+        self.root.title(
+            'SquadLoot · LOKALE LIVE-BETA (unveröffentlicht)'
+            if self.beta_mode else
+            'SquadLoot  ·  Fortnite Squad Tracker ' + current_version())
         self.root.geometry(f'{px(1300)}x{px(840)}')
         self.root.minsize(px(1060), px(680))
         self.root.configure(bg=T.BG)
@@ -2255,6 +2259,16 @@ class Gui:
         tk.Label(panel.body, textvariable=self.live_info, bg=T.SURFACE,
                  fg=T.MUTE, font=font(11), anchor='w', justify='left',
                  wraplength=px(780)).pack(fill='x', pady=(T.S3, 0))
+        if self.beta_mode:
+            self.live_beta_note = tk.StringVar(
+                value='LOKALER TEST: Noch keine Aktionen erkannt.')
+            tk.Label(panel.body, textvariable=self.live_beta_note,
+                     bg=T.SURFACE, fg=T.ACCENT_HI, font=font(12, 'bold'),
+                     justify='left', anchor='w',
+                     wraplength=px(780)).pack(fill='x', pady=(T.S3, T.S2))
+            Button(panel.body, 'Lokalen Testbericht speichern',
+                   self.export_live_beta_report, 'secondary',
+                   icon='download', bg=T.SURFACE).pack(anchor='w')
 
         source = Card(page, fill=T.SURFACE, border=T.LINE)
         source.pack(fill='x', pady=(T.S2, T.S3))
@@ -3174,6 +3188,48 @@ class Gui:
              'und Speicherplatz. Für normale Spiele wieder ausschalten.'
              if enabled else 'Diagnoseaufnahme ausgeschaltet. Keine neuen Clips.'))
 
+    def export_live_beta_report(self):
+        """Save counts and performance numbers only, never user credentials."""
+        if not self.beta_mode:
+            return
+        from datetime import datetime, timezone
+        with self.core.lock:
+            stats = (self.core.vision, self.core.ammo, self.core.food,
+                     self.core.destroyed)
+        engine = self.live_engine
+        lines = [
+            'SquadLoot LIVE-BETA - lokaler Testbericht',
+            'Erstellt (UTC): ' + datetime.now(timezone.utc).isoformat(timespec='seconds'),
+            'Sprache: ' + str(self.core.config.get('live_language', 'en')),
+            'Analyse-FPS (Soll): ' + str(self.core.config.get('live_process_fps', 15)),
+            'Monitor: ' + str(engine.monitor),
+            'Engine-Status: ' + str(engine.state)[:160],
+            'Fehler: ' + str(engine.error)[:160],
+            'Warnung: ' + str(engine.warning)[:160],
+            'Erreichte Analyse-FPS: %.2f' % engine.fps,
+            'Analysezeit: %.1f ms/Bild' % engine.frame_ms,
+            'Uebersprungene Frames: ' + str(engine.dropped),
+            'Truhen (vorlaeufig): ' + str(stats[0]),
+            'Munitionskisten (vorlaeufig): ' + str(stats[1]),
+            'Lebensmittelkisten (vorlaeufig): ' + str(stats[2]),
+            'Zerstoerte Truhen (Replay bestaetigt): ' + str(stats[3]),
+            'Typen: ' + str(engine.chest_types)[:350],
+            '',
+            'Keine Videos, Tokens, Server-URLs oder Spielernamen.',
+            'Fortnite-FPS bitte separat im Spiel vergleichen.',
+        ]
+        try:
+            out = Path(os.getenv('LOCALAPPDATA') or str(Path.home())) / (
+                'SquadLoot/LiveBetaTestbericht.txt')
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+            messagebox.showinfo('SquadLoot Live-Beta',
+                'Testbericht lokal gespeichert:\n' + str(out),
+                parent=self.root)
+        except OSError as exc:
+            messagebox.showerror('Testbericht', str(exc)[:220],
+                                 parent=self.root)
+
     def mark_live_miss(self):
         category = self.missed_kind_values.get(self.missed_kind_var.get())
         if self.live_engine.mark_missed(category):
@@ -3498,6 +3554,12 @@ class Gui:
                              + (f' · Squad {squad_total}' if members else '')
                              + (' · vorläufig' if current else ''))
         engine = self.live_engine
+        if self.beta_mode:
+            self.live_beta_note.set(
+                'LOKALER TEST · '
+                f'{vision_count} Truhen · {ammo} Munitionskisten · '
+                f'{food} Lebensmittelkisten · '
+                'Zerstoerte Truhen: nur Replay.')
         if running:
             self.live_state.set('Live aktiv', T.WARN, T.TINT_WARN)
             metrics = (f' · {engine.fps:.1f} fps · {engine.frame_ms:.0f} ms/Bild'

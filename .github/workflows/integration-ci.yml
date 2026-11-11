@@ -19,6 +19,16 @@ jobs:
         run: python3 -m compileall -q SquadLoot-Pi-Server SquadLoot-Windows-Client
       - name: Tests
         run: xvfb-run -a python3 -m unittest discover -s tests -v
+      - name: Build local-only Live-Beta test ZIP (not a release)
+        if: github.event_name == 'pull_request'
+        run: python3 scripts/build_live_test_bundle.py --output dist/SquadLoot-Live-Beta.zip
+      - name: Upload local-only beta artifact
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SquadLoot-Live-Beta-Test
+          path: dist/SquadLoot-Live-Beta.zip
+          retention-days: 14
       - name: Parse embedded web dashboard JavaScript
         run: |
           python3 - <<'PY'

@@ -27,6 +27,8 @@ class BetaIsolationTests(unittest.TestCase):
                 self.assertIn("os.getenv('SQUADLOOT_BETA_TEST') != '1'", boot)
                 gui = z.read(FOLDER + '/app.py').decode('utf-8')
                 self.assertIn('def export_live_beta_report', gui)
+                self.assertIn("self.live_test_mode = self.beta_mode or current_version() == '1.5.6'", gui)
+                self.assertIn('TEST 1.5.6', gui)
 
 if __name__ == '__main__':
     unittest.main()

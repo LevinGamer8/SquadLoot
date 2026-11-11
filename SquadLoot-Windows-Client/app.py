@@ -1801,6 +1801,9 @@ class Gui:
     def __init__(self):
         self.core = Core()
         self.beta_mode = os.getenv('SQUADLOOT_BETA_TEST') == '1'
+        # The regular 1.5.6 updater installs an explicitly experimental
+        # live detector. Expose the same local reporting UI for test sessions.
+        self.live_test_mode = self.beta_mode or current_version() == '1.5.6'
         self.root = tk.Tk()
         self.root.title(
             'SquadLoot · LOKALE LIVE-BETA (unveröffentlicht)'
@@ -2259,9 +2262,9 @@ class Gui:
         tk.Label(panel.body, textvariable=self.live_info, bg=T.SURFACE,
                  fg=T.MUTE, font=font(11), anchor='w', justify='left',
                  wraplength=px(780)).pack(fill='x', pady=(T.S3, 0))
-        if self.beta_mode:
+        if self.live_test_mode:
             self.live_beta_note = tk.StringVar(
-                value='LOKALER TEST: Noch keine Aktionen erkannt.')
+                value='TESTFUNKTION 1.5.6: XP-Erkennung noch nicht validiert.')
             tk.Label(panel.body, textvariable=self.live_beta_note,
                      bg=T.SURFACE, fg=T.ACCENT_HI, font=font(12, 'bold'),
                      justify='left', anchor='w',
@@ -2367,8 +2370,9 @@ class Gui:
                self.configure_german_live, 'secondary', icon='target',
                bg=T.SURFACE).pack(anchor='w')
         self.live_kinds_note = tk.StringVar(
-            value='Truhentypen werden aus dem Live-Detektor übernommen. '
-                  'Munitions-/Obstkisten bleiben bis zur Replay-Analyse unbestätigt.')
+            value='TEST 1.5.6: Englisch erkennt Truhen sowie Munitions-/'
+                  'Obstkisten aus XP-Popups (vorlaeufig). Zerstoerte Truhen '
+                  'nur nach Replay-Analyse. Deutsch braucht Kalibrierung.')
         label(tuning.body, '', 11, fg=T.MUTE, bg=T.SURFACE,
               textvariable=self.live_kinds_note, wraplength=px(800),
               justify='left', anchor='w').pack(fill='x', pady=(T.S2, 0))
@@ -3190,7 +3194,7 @@ class Gui:
 
     def export_live_beta_report(self):
         """Save counts and performance numbers only, never user credentials."""
-        if not self.beta_mode:
+        if not self.live_test_mode:
             return
         from datetime import datetime, timezone
         with self.core.lock:
@@ -3198,7 +3202,7 @@ class Gui:
                      self.core.destroyed)
         engine = self.live_engine
         lines = [
-            'SquadLoot LIVE-BETA - lokaler Testbericht',
+            'SquadLoot 1.5.6 TEST-UPDATE - lokaler Erkennungsbericht',
             'Erstellt (UTC): ' + datetime.now(timezone.utc).isoformat(timespec='seconds'),
             'Sprache: ' + str(self.core.config.get('live_language', 'en')),
             'Analyse-FPS (Soll): ' + str(self.core.config.get('live_process_fps', 15)),
@@ -3223,7 +3227,7 @@ class Gui:
                 'SquadLoot/LiveBetaTestbericht.txt')
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-            messagebox.showinfo('SquadLoot Live-Beta',
+            messagebox.showinfo('SquadLoot Erkennungstest',
                 'Testbericht lokal gespeichert:\n' + str(out),
                 parent=self.root)
         except OSError as exc:
@@ -3554,12 +3558,12 @@ class Gui:
                              + (f' · Squad {squad_total}' if members else '')
                              + (' · vorläufig' if current else ''))
         engine = self.live_engine
-        if self.beta_mode:
+        if self.live_test_mode:
             self.live_beta_note.set(
-                'LOKALER TEST · '
+                'TEST 1.5.6 · vorlaeufige Live-Werte: '
                 f'{vision_count} Truhen · {ammo} Munitionskisten · '
                 f'{food} Lebensmittelkisten · '
-                'Zerstoerte Truhen: nur Replay.')
+                'Zerstoerte Truhen nur aus Replay.')
         if running:
             self.live_state.set('Live aktiv', T.WARN, T.TINT_WARN)
             metrics = (f' · {engine.fps:.1f} fps · {engine.frame_ms:.0f} ms/Bild'
